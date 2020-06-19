@@ -108,6 +108,15 @@ begin
                     end if;
                 end if;
                 
+--            when dividing =>
+--                divValid_i <= '0';
+--                if divValidI = '1' and divValidQ = '1' then
+--                    dataI_o <= signed(divI_o(divI_o'length-1 downto PAD));
+--                    dataQ_o <= signed(divQ_o(divQ_o'length-1 downto PAD));
+--                    valid_o <= '1';
+--                    state <= idle;
+--                end if;
+                
             when finishing =>
                 dataI_o <= adc1;
                 dataQ_o <= adc2;
