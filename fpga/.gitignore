@@ -1,0 +1,14 @@
+# *
+# !rp-feedback.srcs/
+# !rp-feedback.srcs/sources_1/
+# !rp-feedback.srcs/sources_1/new/
+# !rp-feedback.srcs/sources_1/new/*
+# !rp-feedback.srcs/sources_1/ip/
+# !rp-feedback.srcs/sources_1/new/*
+
+*.xpr
+*rp-feedback*/
+!rp-feedback.srcs/
+rp-feedback.srcs/sources_1/bd/
+rp-feedback.srcs/sources_1/ip/*/*
+!rp-feedback.srcs/sources_1/ip/**/*.xci
