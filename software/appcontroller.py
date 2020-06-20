@@ -1,68 +1,37 @@
-from bitstring import BitArray
-import serial
+# from bitstring import BitArray
+# import serial
 import time
+import types
+import subprocess
+import warnings
 
+MEM_ADDR = 0x40000000
 
 def write(data,header):
-    if header["method"] == "serial":
-        r = write_serial(data,header["aux"],header["read"])
-    else:
-        r = None
-    return r
-
-
-def write_serial(data,header,readData):
-    #Process header
-    #Open serial port
-    portName = header["port"]
-    baudrate = header["baudrate"]
-    waitTime = 0.1
-    response = {
-        "msg"   :   "",
-        "err"   :   False,
-        "data"  :   ""
-    }
-    try:
-        ser = serial.Serial(portName,baudrate,timeout=waitTime)
-        #ser.open()
-    except serial.SerialException:
-        # print("Unable to open",portName,". Exiting...")
-        response["msg"] = "Unable to open %s." % portName
-        response["err"] = True
-        return response
-        
-    #Flush buffer
-    ser.flushInput()
-    ser.flushOutput()
+    if len(data) > 0:
+        addr = MEM_ADDR + data[0]
     
-    #Write data
-    x = ser.write(data)
+    if header["mode"] == "write":
+        cmd = ['monitor',format(addr),'0x' + '{:0>8x}'.format(data[1])]
+    elif header["mode"] == "read":
+        cmd = ['monitor',format(addr)]
+    elif header["mode"] == "fetch raw":
+        cmd = ['./fetchData',format(header["numFetch"]),'0']
+    elif header["mode"] == "fetch processed":
+        cmd = ['./fetchData',format(header["numFetch"]),'1']
 
-    if readData:
-        #Read data
-        time.sleep(waitTime)
-        try:
-            tmp = ser.read(4)
-            if not tmp:
-                print("No data received")
-                response["msg"] = "Waited for data, but no response from %s." % portName
-                response["err"] = True
-                response["data"] = ""
-            else:
-                tmp2 = BitArray(tmp)
-                tmp2.byteswap()
-                response["data"] = tmp2.hex
-        except Exception:
-            print(
-                "main: error: exception for\n",
-                f"{traceback.format_exc()}",
-                )
-            response["msg"] = "Unable to read from %s." % portName
-            # response["msg"] = "Exception when reading:\n" + f"{traceback.format_exc()}"
-            response["err"] = True
-            
-    #Close serial port
-    ser.close()
+    if ("print" in header) and (header["print"]):
+        print("Command: ",cmd)
+    result = subprocess.run(cmd,stdout=subprocess.PIPE)
+    if result.returncode != 0:
+        response = {"err":True,"errMsg":"Bus error"}
+    else:
+        response = {"err":False,"errMsg":""}
+        if len(result.stdout) > 0:
+            response["data"] = result.stdout.decode('ascii').rstrip().split("\n")
+        else:
+            response["data"] = []
+
     return response
         
 

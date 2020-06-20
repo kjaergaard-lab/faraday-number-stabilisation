@@ -1,4 +1,12 @@
 classdef DPFeedback < handle
+    properties
+        rawI
+        rawQ
+        tSample
+        signal
+        tPulse
+    end
+    
     properties(SetAccess = immutable)
         conn
         
@@ -26,16 +34,15 @@ classdef DPFeedback < handle
     end
     
     properties(Constant)
-        TCP_PORT = 6666;
         CLK = 125e6;
     end
     
     methods
         function self = DPFeedback(varargin)
             if numel(varargin)==1
-                self.conn = tcpclient(varargin{1},self.TCP_PORT);
+                self.conn = DPFeedbackClient;
             else
-                self.conn = tcpclient('rp-f01ec3.px.otago.ac.nz',self.TCP_PORT);
+                self.conn = DPFeedbackClient;
             end
             
             self.trigReg0 = DPFeedbackRegister('0',self.conn);
@@ -51,7 +58,7 @@ classdef DPFeedback < handle
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
             self.numpulses = DPFeedbackParameter([16,31],self.pulseReg0)...
                 .setLimits('lower',0,'upper',2^16-1)...
-                .setFunctions('to',@(x) x,'from',@(x) x);
+                .setFunctions('to',@(x) round(x),'from',@(x) x);
             self.period = DPFeedbackParameter([0,31],self.pulseReg1)...
                 .setLimits('lower',500e-9,'upper',10)...
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
@@ -67,6 +74,7 @@ classdef DPFeedback < handle
                 .setLimits('lower',0,'upper',2^4-1)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
             self.samplesCollected = DPFeedbackParameter([0,14],self.sampleReg0)...
+                .setLimits('lower',0,'upper',2^14)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
             
             %Secondary processing
@@ -83,7 +91,7 @@ classdef DPFeedback < handle
         
         function self = setDefaults(self,varargin)
             self.width.set(1e-6);
-            self.numpulses.set(500);
+            self.numpulses.set(50);
             self.period.set(5e-6);
             
             self.delay.set(0);
@@ -103,15 +111,94 @@ classdef DPFeedback < handle
         end
         
         function self = fetch(self)
+            %Read registers
             self.pulseReg0.read;
             self.pulseReg1.read;
             self.avgReg0.read;
             self.integrateReg0.read;
+            self.sampleReg0.read;
+            
+            %Read parameters
+            self.width.get;
+            self.numpulses.get;
+            self.period.get;
+            
+            self.delay.get;
+            self.samplesPerPulse.get;
+            self.log2Avgs.get;
+            
+            self.sumStart.get;
+            self.subStart.get;
+            self.sumWidth.get;
+            
+            %Get number of collected samples
+            self.samplesCollected.read;
         end
         
         function self = start(self)
             self.trigReg0.set(1,[0,0]).write;
             self.trigReg0.set(0,[0,0]);
+        end
+        
+        function self = getRaw(self)
+            self.samplesCollected.read;
+            self.conn.write(0,'mode','fetch raw','numFetch',self.samplesCollected.get);
+            data = typecast(self.conn.recvMessage,'uint8');
+            [dataI,dataQ] = deal(zeros(self.samplesCollected.value,1));
+
+            mm = 1;
+            for nn=1:4:numel(data)
+                dataI(mm) = double(typecast(uint8(data(nn+(0:1))),'int16'));
+                dataQ(mm) = double(typecast(uint8(data(nn+(2:3))),'int16'));
+                mm = mm+1;
+            end
+            
+            self.rawI = reshape(dataI,self.samplesPerPulse.get,self.numpulses.get);
+            self.rawQ = reshape(dataQ,self.samplesPerPulse.get,self.numpulses.get);
+            
+            self.tSample = 2^self.log2Avgs.get/self.CLK*(0:(self.samplesPerPulse.get-1))';
+        end
+        
+        function self = getProcessed(self)
+            self.samplesCollected.read;
+            self.conn.write(0,'mode','fetch processed','numFetch',self.numpulses.get);
+            raw = typecast(self.conn.recvMessage,'uint8');
+            
+            self.signal = zeros(self.numpulses.get,1);
+            mm = 1;
+            for nn=1:4:numel(raw)
+                self.signal(mm) = double(typecast(uint8(raw(nn+(0:3))),'uint32'));
+                mm = mm+1;
+            end
+            
+            self.tPulse = self.period.value*(0:(self.numpulses.get-1))';
+        end
+        
+        function disp(self)
+            fprintf(1,'DPFeedback object with properties:\n');
+            fprintf(1,'\t Registers\n');
+            fprintf(1,'\t\t     pulseReg0: %08x\n',self.pulseReg0.value);
+            fprintf(1,'\t\t     pulseReg1: %08x\n',self.pulseReg1.value);
+            fprintf(1,'\t\t       avgReg0: %08x\n',self.avgReg0.value);
+            fprintf(1,'\t\t    sampleReg0: %08x\n',self.sampleReg0.value);
+            fprintf(1,'\t\t integrateReg0: %08x\n',self.integrateReg0.value);
+            fprintf(1,'\t ----------------------------------\n');
+            fprintf(1,'\t Pulse Parameters\n');
+            fprintf(1,'\t\t       Pulse Width: %.2e s\n',self.width.value);
+            fprintf(1,'\t\t      Pulse Period: %.2e s\n',self.period.value);
+            fprintf(1,'\t\t  Number of pulses: %d\n',self.numpulses.value);
+            fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
+            fprintf(1,'\t Averaging Parameters\n');
+            fprintf(1,'\t\t             Delay: %.2e s\n',self.delay.value);
+            fprintf(1,'\t\t Samples per pulse: %d\n',self.samplesPerPulse.value);
+            fprintf(1,'\t\t   log2(# of avgs): %d\n',self.log2Avgs.value);
+            fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
+            fprintf(1,'\t Integration Parameters\n');
+            fprintf(1,'\t\t   Start of summation window: %d\n',self.sumStart.value);
+            fprintf(1,'\t\t Start of subtraction window: %d\n',self.subStart.value);
+            fprintf(1,'\t\t Width of integration window: %d\n',self.sumWidth.value);
+            fprintf(1,'\t\t Number of samples collected: %d\n',self.samplesCollected.value);
+            
         end
         
         

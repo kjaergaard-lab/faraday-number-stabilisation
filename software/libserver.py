@@ -32,7 +32,8 @@ class Message:
         elif mode == "rw" or mode == "wr":
             events = selectors.EVENT_WRITE | selectors.EVENT_READ
         else:
-            raise ValueError(f"Invalid events mask mode {repr(mode)}.")
+            # raise ValueError(f"Invalid events mask mode {repr(mode)}.")
+            raise ValueError("Invalid events mask mode {}".format(repr(mode)))
         self.selector.modify(self.sock,events,data=self)
 
     def _read(self):
@@ -98,7 +99,8 @@ class Message:
         try:
             self.selector.unregister(self.sock)
         except Exception as e:
-            print(f"Error: selector.unregister() exception for",f"{self.addr}: {repr(e)}")
+            # print(f"Error: selector.unregister() exception for",f"{self.addr}: {repr(e)}")
+            print("Errpr: selector.unregister() exception for {}: {}".format(self.addr,repr(e)))
         finally:
             #Delete reference to socket object for garbage collection
             self.sock = None
@@ -127,20 +129,17 @@ class Message:
         #Processes the message
         if len(self._recv_buffer) >= self.msg_len:
             self.msg = self._recv_buffer[:self.msg_len]
-            if self.msg_len/4 < 10:
-                pmsg = []
-                for d in struct.iter_unpack("<I",self._recv_buffer[:self.msg_len]):
-                    pmsg.append(d[0])
+            pmsg = []
+            for d in struct.iter_unpack("<I",self._recv_buffer[:self.msg_len]):
+                pmsg.append(d[0])
+            if ("print" in self.header) and (self.header["print"]):
                 print("Message:",self.msg)
                 print("\n".join("%08x"%item for item in pmsg))
-            else:
-                print("Message received, writing to server")
             
             self._recv_buffer = self._recv_buffer[self.msg_len:]
             
             #Write data using io-controller
-            # self.fpga_response = appcontroller.write(self.msg,self.header)
-            self.fpga_response = {"msg": "Hello World!","data": [1,2,3,4]}
+            self.fpga_response = appcontroller.write(pmsg,self.header)
             print("Message written to server")
             #At end of reading of data, set class to write mode
             self._set_selector_events_mask("w")
@@ -155,7 +154,8 @@ class Message:
         tmp = json_str.encode('ascii')
         self._send_buffer = struct.pack("<H",len(tmp)) + tmp
         for d in data:
-            self._send_buffer += struct.pack("<I",d)
+            # print(format(int(d,16)))
+            self._send_buffer += struct.pack("<I",int(d,16))
         
 
             

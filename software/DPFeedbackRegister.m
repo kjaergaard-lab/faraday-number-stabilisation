@@ -30,7 +30,7 @@ classdef DPFeedbackRegister < handle
             if addr<0 || addr>self.MAX_ADDR
                 error('Address is out of range [%08x,%08x]',0,self.MAX_ADDR);
             else
-                self.addr = addr;
+                self.addr = uint32(addr);
             end
         end
         
@@ -49,11 +49,13 @@ classdef DPFeedbackRegister < handle
         end
         
         function self = write(self)
-            %write to connection...
+            data = [self.addr,self.value];
+            self.conn.write(data,'mode','write');
         end
         
         function self = read(self)
-            %read from connection
+            self.conn.write(self.addr,'mode','read');
+            self.value = self.conn.recvMessage;
         end
     
     end

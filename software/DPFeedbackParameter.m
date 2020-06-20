@@ -121,17 +121,51 @@ classdef DPFeedbackParameter < handle
             %GET Gets the physical value of the parameter from the integer
             %value
             self.intValue = self.reg.get(self.bits);
-            self.value = self.fromInteger(self.intValue,varargin{:});
+            self.value = self.fromInteger(double(self.intValue),varargin{:});
             r = self.value;
         end
         
         function self = read(self)
             self.reg.read;
-            self.intValue = self.reg.get(self.bits);
+            self.get;
         end
         
         function self = write(self)
             self.reg.write;
+        end
+        
+        function disp(self)
+            fprintf(1,'\t DBFeedbackParameter with properties:\n');
+            fprintf(1,'\t\t            Bit range: [%d,%d]\n',self.bits(1),self.bits(2));
+            if isnumeric(self.value) && numel(self.value)==1
+                fprintf(1,'\t\t       Physical value: %.4g\n',self.value);
+            elseif isnumeric(self.value) && numel(self.value)<=10
+                fprintf(1,'\t\t       Physical value: [%s]\n',strtrim(sprintf('%.4g ',self.value)));
+            elseif isnumeric(self.value) && numel(self.value)>10
+                fprintf(1,'\t\t       Physical value: [%dx%d %s]\n',size(self.value),class(self.value));
+            elseif ischar(self.value)
+                fprintf(1,'\t\t       Physical value: %s\n',self.value);
+            end
+            if numel(self.intValue)==1
+                fprintf(1,'\t\t        Integer value: %d\n',self.intValue);
+            elseif numel(self.value)<=10
+                fprintf(1,'\t\t        Integer value: [%s]\n',strtrim(sprintf('%d ',self.intValue)));
+            elseif numel(self.value)>10
+                fprintf(1,'\t\t        Integer value: [%dx%d %s]\n',size(self.value),class(self.value));
+            end
+            if ~isempty(self.lowerLimit) && isnumeric(self.lowerLimit)
+                fprintf(1,'\t\t          Lower limit: %.4g\n',self.lowerLimit);
+            end
+            if ~isempty(self.upperLimit) && isnumeric(self.upperLimit)
+                fprintf(1,'\t\t          Upper limit: %.4g\n',self.upperLimit);
+            end
+            
+            if ~isempty(self.toIntegerFunction)
+                fprintf(1,'\t\t   toInteger Function: %s\n',func2str(self.toIntegerFunction));
+            end
+            if ~isempty(self.fromIntegerFunction)
+                fprintf(1,'\t\t fromInteger Function: %s\n',func2str(self.fromIntegerFunction));
+            end
         end
         
     end

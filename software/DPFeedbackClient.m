@@ -12,26 +12,28 @@ classdef DPFeedbackClient < handle
     
     properties(Constant)
         TCP_PORT = 6666;
-        HOST_ADDRESS = '127.0.0.1';
+%         HOST_ADDRESS = '127.0.0.1';
+        HOST_ADDRESS = '172.22.250.94';
     end
     
     methods
         function self = DPFeedbackClient
-            
+            self.initRead;
         end
         
         function open(self)
-            self.client = tcpclient(self.HOST_ADDRESS,self.TCP_PORT);
+            self.client = tcpclient(self.HOST_ADDRESS,self.TCP_PORT,'Timeout',1,'ConnectTimeout',1);
         end
         
         function close(self)
             delete(self.client);
+            self.client = [];
         end
         
         function delete(self)
             try
                 delete(self.client);
-            catch err
+            catch
                 disp('Error deleting client');
             end
         end
@@ -46,6 +48,9 @@ classdef DPFeedbackClient < handle
         function self = write(self,data,varargin)
             if mod(numel(varargin),2)~=0
                 error('Variable arguments must be in name/value pairs');
+            end
+            if numel(data) == 0
+                data = 0;
             end
             self.open;
             try
