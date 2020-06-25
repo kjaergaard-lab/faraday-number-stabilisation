@@ -74,7 +74,7 @@ begin
     elsif rising_edge(adcClk) then
         if bus_m.reset = '1' then
             addra <= (others => '0');
-        elsif valid_i = '1' then
+        elsif valid_i = '1' and addra < (addra'range => '1') then
             addra <= addra + 1;
         end if;
     end if;

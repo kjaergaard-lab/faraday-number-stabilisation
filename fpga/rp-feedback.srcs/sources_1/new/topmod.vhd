@@ -10,6 +10,7 @@ entity topmod is
     port (
         sysClk          :   in  std_logic;
         aresetn         :   in  std_logic;
+        trig_i          :   in  std_logic;
 
         addr_i          :   in  unsigned(AXI_ADDR_WIDTH-1 downto 0);            --Address out
         writeData_i     :   in  std_logic_vector(AXI_DATA_WIDTH-1 downto 0);    --Data to write
@@ -33,8 +34,7 @@ component DispersiveProbing is
         adcClk          :   in  std_logic;
         aresetn         :   in  std_logic;
 
-        trig_i          :   in  std_logic;
-        cntrl_i         :   in  std_logic;
+        cntrl_i         :   in  t_control;
         adcData_i       :   in  t_adc_combined;
 
         pulseReg0       :   in  t_param_reg;
@@ -52,6 +52,29 @@ component DispersiveProbing is
     );
 end component;
 
+component NumberStabilisation is
+    port(
+        sysClk          :   in  std_logic;
+        adcClk          :   in  std_logic;
+        aresetn         :   in  std_logic;
+        cntrl_i         :   in  t_control;
+        
+        computeReg0     :   in  t_param_reg;
+        computeReg1     :   in  t_param_reg;
+        computeReg2     :   in  t_param_reg;
+        
+        pulseReg0       :   in  t_param_reg;
+        pulseReg1       :   in  t_param_reg;
+        
+        quad_i          :   in  unsigned(23 downto 0);
+        valid_i         :   in  std_logic;
+        
+        cntrl_o         :   out t_control;
+        pulse_o         :   out std_logic
+        
+    );
+end component;
+
 --
 -- AXI communication signals
 --
@@ -60,13 +83,27 @@ signal bus_m        :   t_axi_bus_master    :=  INIT_AXI_BUS_MASTER;
 signal bus_s        :   t_axi_bus_slave     :=  INIT_AXI_BUS_SLAVE;
 
 --
--- Dispersive signals
+-- Shared registers
 --
 signal triggers     :   t_param_reg :=  (others => '0');
+signal sharedReg0   :   t_param_reg :=  (others => '0');
+
+--
+-- Dispersive signals
+--
+
 signal pulseReg0, pulseReg1, avgReg0, integrateReg0 :   t_param_reg :=  (others => '0');
-signal quadSignal   :   unsigned(23 downto 0);
-signal quadValid    :   std_logic;
-signal pulse, shutter   :   std_logic   :=  '0';
+signal quadSignal           :   unsigned(23 downto 0);
+signal quadValid            :   std_logic;
+signal pulseDP, shutterDP   :   std_logic   :=  '0';
+signal dpControl_i          :   t_control   :=  INIT_CONTROL_ENABLED;
+
+--
+-- Feedback signals
+--
+signal fbControl_i, fbControl_o :   t_control   :=  INIT_CONTROL_ENABLED;
+signal fbComputeReg0, fbComputeReg1, fbComputeReg2, fbPulseReg0, fbPulseReg1   :   t_param_reg :=  (others => '0');
+signal pulseMW                  :   std_logic;
 
 --
 -- Block memory signals
@@ -82,8 +119,7 @@ port map(
     adcClk          =>  adcClk,
     aresetn         =>  aresetn,
 
-    trig_i          =>  triggers(0),
-    cntrl_i         =>  '0',
+    cntrl_i         =>  dpControl_i,
     adcData_i       =>  adcData_i,
 
     pulseReg0       =>  pulseReg0,
@@ -96,12 +132,36 @@ port map(
 
     quad_o          =>  quadSignal,
     valid_o         =>  quadValid,
-    pulse_o         =>  pulse,
-    shutter_o       =>  shutter
+    pulse_o         =>  pulseDP,
+    shutter_o       =>  shutterDP
 );
 
-ext_o(0) <= pulse;
-ext_o(1) <= shutter;
+StabiliseNumber: NumberStabilisation
+port map(
+    sysClk          =>  sysClk,
+    adcClk          =>  adcClk,
+    aresetn         =>  aresetn,
+    cntrl_i         =>  fbControl_i,
+    
+    computeReg0     =>  fbComputeReg0,
+    computeReg1     =>  fbComputeReg1,
+    computeReg2     =>  fbComputeReg2,
+    
+    pulseReg0       =>  fbPulseReg0,
+    pulseReg1       =>  fbPulseReg1,
+    
+    quad_i          =>  quadSignal,
+    valid_i         =>  quadValid,
+    
+    cntrl_o         =>  fbControl_o,
+    pulse_o         =>  pulseMW
+    
+);
+
+ext_o(0) <= pulseDP;
+ext_o(1) <= shutterDP;
+ext_o(2) <= pulseMW;
+
 
 
 --
@@ -113,15 +173,27 @@ bus_m.data <= writeData_i;
 readData_o <= bus_s.data;
 resp_o <= bus_s.resp;
 
+--
+-- Shared registers
+--
+dpControl_i.start <= triggers(0) or trig_i;
+dpControl_i.enable <= sharedReg0(0);
+dpControl_i.stop <= fbControl_o.stop;
+fbControl_i.start <= triggers(1) or trig_i;
+fbControl_i.enable <= sharedReg0(1);
+
 Parse: process(sysClk,aresetn) is
 begin
     if aresetn = '0' then
         comState <= idle;
         bus_s <= INIT_AXI_BUS_SLAVE;
         mem_bus_m <= (others => INIT_MEM_BUS_MASTER);
+        triggers <= (others => '0');
+        sharedReg0 <= (others => '0');
     elsif rising_edge(sysClk) then
         FSM: case(comState) is
             when idle =>
+                triggers <= (others => '0');
                 bus_s.resp <= "00";
                 if bus_m.valid(0) = '1' then
                     comState <= processing;
@@ -139,12 +211,17 @@ begin
                                 mem_bus_m(0).reset <= '1';
                                 mem_bus_m(1).reset <= '1';
                                 
-                            when X"000004" => rw(bus_m,bus_s,comState,pulseReg0);
-                            when X"000008" => rw(bus_m,bus_s,comState,pulseReg1);
-                            when X"00000C" => rw(bus_m,bus_s,comState,avgReg0);
-                            when X"000010" => readOnly(bus_m,bus_s,comState,mem_bus_s(0).last);
-                            when X"000014" => rw(bus_m,bus_s,comState,integrateReg0);
-                            
+                            when X"000004" => rw(bus_m,bus_s,comState,sharedReg0);
+                            when X"000008" => rw(bus_m,bus_s,comState,pulseReg0);
+                            when X"00000C" => rw(bus_m,bus_s,comState,pulseReg1);
+                            when X"000010" => rw(bus_m,bus_s,comState,avgReg0);
+                            when X"000014" => readOnly(bus_m,bus_s,comState,mem_bus_s(0).last);
+                            when X"000018" => rw(bus_m,bus_s,comState,integrateReg0);
+                            when X"00001C" => rw(bus_m,bus_s,comState,fbComputeReg0);
+                            when X"000020" => rw(bus_m,bus_s,comState,fbComputeReg1);
+                            when X"000024" => rw(bus_m,bus_s,comState,fbComputeReg2);
+                            when X"000028" => rw(bus_m,bus_s,comState,fbPulseReg0);
+                            when X"00002C" => rw(bus_m,bus_s,comState,fbPulseReg1);
                             
                             when others => 
                                 comState <= finishing;

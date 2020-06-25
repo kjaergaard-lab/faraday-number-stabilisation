@@ -6,7 +6,7 @@ classdef DPFeedbackParameter < handle
     end
     
     properties(SetAccess = protected)
-        reg
+        regs
         value               %Human-readable value in real units
         intValue            %Integer value written for FPGA
         toIntegerFunction   %Function converting real values to integer values
@@ -16,15 +16,29 @@ classdef DPFeedbackParameter < handle
     methods
         function self = DPFeedbackParameter(bits,regIn)
             self.bits = bits;
-            self.reg = regIn;
+            self.regs = regIn;
+            if size(self.bits,1) ~= numel(self.regs)
+                error('Number of registers must be the same as the number of bit ranges');
+            end
+            
+            self.toIntegerFunction = @(x) x;
+            self.fromIntegerFunction = @(x) x;
         end
         
         function set.bits(self,bits)
-            if numel(bits)~=2 || any(bits<0) || any(bits>31)
-                error('Bits must be a 2-element vector with values in [0,31]');
+            if mod(numel(bits),2)~=0 || any(bits(:)<0) || any(bits(:)>31) || size(bits,2)>2
+                error('Bits must be a 2-element vector with values in [0,31] or an Nx2 matrix with values in [0,31]');
             else
-                self.bits = bits;
+                if numel(bits)==2
+                    self.bits = bits(:)';
+                else
+                    self.bits = bits;
+                end
             end  
+        end
+        
+        function N = numbits(self)
+            N = sum(abs(diff(self.bits,1,2)),1)+1;
         end
         
         function self = setFunctions(self,varargin)
@@ -95,10 +109,6 @@ classdef DPFeedbackParameter < handle
                 error('Value is higher than the upper limit!');
             end
             
-            if log2(v) > abs(diff(self.bits)+1)
-                error('Value will not fit in bit-range [%d,%d]',self.bits(1),self.bits(1));
-            end
-            
         end
         
         function self = set(self,v,varargin)
@@ -106,37 +116,65 @@ classdef DPFeedbackParameter < handle
             %to an integer as well
             self.checkLimits(v);
             tmp = self.toInteger(v,varargin{:});
-            if tmp > 2^(abs(diff(self.bits)+1))
-                error('Value will not fit in bit-range [%d,%d]',self.bits(1),self.bits(1));
+            if log2(tmp) > self.numbits
+                error('Value will not fit in bit range with %d bits',self.numbits);
             end
             self.value = v;
             self.intValue = tmp;
             if islogical(self.intValue)
                 self.intValue = uint32(self.intValue);
             end
-            self.reg.set(self.intValue,self.bits);
+            
+            if numel(self.regs) == 1
+                self.regs.set(self.intValue,self.bits);
+            else
+                tmp = uint64(self.intValue);
+                for nn=1:numel(self.regs)
+                    self.regs(nn).set(tmp,self.bits(nn,:));
+                    tmp = bitshift(tmp,-abs(diff(self.bits(nn,:)))-1);
+                end
+            end
         end
         
         function r = get(self,varargin)
             %GET Gets the physical value of the parameter from the integer
             %value
-            self.intValue = self.reg.get(self.bits);
+            if numel(self.regs) == 1
+                self.intValue = self.regs.get(self.bits);
+            else
+                tmp = uint64(0);
+                for nn=numel(self.regs):-1:2
+                    tmp = tmp+bitshift(uint64(self.regs(nn).get(self.bits(nn,:))),abs(diff(self.bits(nn-1,:)))+1);
+                end
+                tmp = tmp+uint64(self.regs(1).get(self.bits(1,:)));
+                self.intValue = tmp;
+            end
             self.value = self.fromInteger(double(self.intValue),varargin{:});
             r = self.value;
         end
         
         function self = read(self)
-            self.reg.read;
+            for nn=1:numel(self.regs)
+                self.regs(nn).read;
+            end
             self.get;
         end
         
         function self = write(self)
-            self.reg.write;
+            for nn=1:numel(self.regs)
+                self.regs(nn).write;
+            end
         end
         
         function disp(self)
             fprintf(1,'\t DBFeedbackParameter with properties:\n');
-            fprintf(1,'\t\t            Bit range: [%d,%d]\n',self.bits(1),self.bits(2));
+            if size(self.bits,1) == 1
+                fprintf(1,'\t\t            Bit range: [%d,%d]\n',self.bits(1),self.bits(2));
+            else
+                for nn=1:size(self.bits,1)
+                    fprintf(1,'\t\t  Bit range for reg %d: [%d,%d]\n',nn-1,self.bits(nn,1),self.bits(nn,2)); 
+                end
+            end
             if isnumeric(self.value) && numel(self.value)==1
                 fprintf(1,'\t\t       Physical value: %.4g\n',self.value);
             elseif isnumeric(self.value) && numel(self.value)<=10

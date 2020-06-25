@@ -11,8 +11,7 @@ entity DispersiveProbing is
         adcClk          :   in  std_logic;
         aresetn         :   in  std_logic;
 
-        trig_i          :   in  std_logic;
-        cntrl_i         :   in  std_logic;
+        cntrl_i         :   in  t_control;
         adcData_i       :   in  t_adc_combined;
 
         pulseReg0       :   in  t_param_reg;
@@ -36,15 +35,14 @@ component PulseGen is
     port(
         clk         :   in  std_logic;
         aresetn     :   in  std_logic;
-        trig_i      :   in  std_logic;   
-        cntrl_i     :   in  std_logic;
+        cntrl_i     :   in  t_control;
         
         reg0        :   in  t_param_reg;
         reg1        :   in  t_param_reg;
         
         pulse_o     :   out std_logic;
         gate_o      :   out std_logic;
-        status_o    :   out std_logic
+        status_o    :   out t_module_status
     );
 end component;    
 
@@ -79,7 +77,10 @@ component IntegrateADCData is
         
         dataI_o     :   out signed(EXT_WIDTH-1 downto 0);
         dataQ_o     :   out signed(EXT_WIDTH-1 downto 0);
-        valid_o     :   out std_logic
+        valid_o     :   out std_logic;
+        
+        dataSave_o  :   out t_mem_data;
+        validSave_o :   out std_logic
     );
 end component;
 
@@ -112,12 +113,15 @@ component SaveADCData is
 end component;
 
 
-signal pulse, pulseGate, pulseStatus    :   std_logic   :=  '0';
+signal pulse, pulseGate    :   std_logic   :=  '0';
+signal pulseStatus  :   t_module_status :=  INIT_MODULE_STATUS;
 signal adcAvg   :   t_adc_combined  :=  (others => '0');
 signal validAvg :   std_logic;
 
 signal dataI, dataQ :   signed(23 downto 0) :=  (others => '0');
 signal validIntegrate   :   std_logic   :=  '0';
+signal intSave      :   t_mem_data;
+signal intSaveValid :   std_logic;
 
 signal quadSignal   :   unsigned(23 downto 0);
 signal validQuad    :   std_logic   :=  '0';
@@ -128,7 +132,6 @@ Pulses: PulseGen
 port map(
     clk     =>  sysClk,
     aresetn =>  aresetn,
-    trig_i  =>  trig_i,
     cntrl_i =>  cntrl_i,
     reg0    =>  pulseReg0,
     reg1    =>  pulseReg1,
@@ -137,7 +140,7 @@ port map(
     status_o=>  pulseStatus
 );
 pulse_o <= pulse;
-shutter_o <= pulseStatus;
+shutter_o <= pulseStatus.running;
 
 InitAvg: QuickAvg
 port map(
@@ -164,7 +167,9 @@ port map(
     reg0        =>  integrateReg0,
     dataI_o     =>  dataI,
     dataQ_o     =>  dataQ,
-    valid_o     =>  validIntegrate
+    valid_o     =>  validIntegrate,
+    dataSave_o  =>  intSave,
+    validSave_o =>  intSaveValid
 );
 
 Compute: ComputeSignal
@@ -197,8 +202,8 @@ port map(
     sysClk      =>  sysClk,
     adcClk      =>  adcClk,
     aresetn     =>  aresetn,
-    data_i      =>  std_logic_vector(quadSignal),
-    valid_i     =>  validQuad,
+    data_i      =>  intSave,
+    valid_i     =>  intSaveValid,
     bus_m       =>  bus_m(1),
     bus_s       =>  bus_s(1)
 );

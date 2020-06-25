@@ -22,7 +22,10 @@ entity IntegrateADCData is
         
         dataI_o     :   out signed(EXT_WIDTH-1 downto 0);
         dataQ_o     :   out signed(EXT_WIDTH-1 downto 0);
-        valid_o     :   out std_logic
+        valid_o     :   out std_logic;
+        
+        dataSave_o  :   out t_mem_data;
+        validSave_o :   out std_logic
     );
 end IntegrateADCData;
 
@@ -42,7 +45,7 @@ PORT (
 );
 END COMPONENT;
 
-type t_status_local is (idle, summing, dividing, finishing);
+type t_status_local is (idle, summing, dividing, finishing, output, saving);
 
 signal sumStart, sumEnd, subStart, subEnd, width, count    :   unsigned(PAD-1 downto 0)    :=  (others => '0');
 signal adc1, adc1_i, adc2, adc2_i   :   signed(EXT_WIDTH-1 downto 0)    :=  (others => '0');
@@ -80,11 +83,14 @@ begin
         adc2 <= (others => '0');
         count <= (others => '0');
         divValid_i <= '0';
+        valid_o <= '0';
+        validSave_o <= '0';
     elsif rising_edge(adcClk) then
         SumDiffFSM: case(state) is
             when idle =>
                 valid_o <= '0';
                 divValid_i <= '0';
+                validSave_o <= '0';
                 if trig = "01" then
                     state <= summing;
                     adc1 <= (others => '0');
@@ -102,7 +108,7 @@ begin
                         adc1 <= adc1 - adc1_i;
                         adc2 <= adc2 - adc2_i;
                         if count = subEnd then
-                            state <= finishing;
+                            state <= output;
 --                            divValid_i <= '1';
                         end if;
                     end if;
@@ -117,10 +123,19 @@ begin
 --                    state <= idle;
 --                end if;
                 
-            when finishing =>
+            when output =>
                 dataI_o <= adc1;
                 dataQ_o <= adc2;
                 valid_o <= '1';
+                
+                dataSave_o <= std_logic_vector(resize(adc1,dataSave_o'length));
+                validSave_o <= '1';
+                state <= saving;
+                
+            when saving =>
+                valid_o <= '0';
+                dataSave_o <= std_logic_vector(resize(adc2,dataSave_o'length));
+                validSave_o <= '1';
                 state <= idle;
                 
         

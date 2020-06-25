@@ -65,9 +65,28 @@ constant INIT_MEM_BUS_SLAVE     :   t_mem_bus_slave :=  (data   =>  (others => '
 constant INIT_MEM_BUS           :   t_mem_bus       :=  (m  =>  INIT_MEM_BUS_MASTER,
                                                          s  =>  INIT_MEM_BUS_SLAVE);
 
---constant INIT_MEM_BUS_MASTERS   :   t_mem_bus_master_array  :=  (others => INIT_MEM_BUS_MASTER);                                                         
---constant INIT_MEM_BUS_SLAVES    :   t_mem_bus_slave_array   :=  (others => INIT_MEM_BUS_SLAVE);
+
+type t_control is record
+    enable  :   std_logic;
+    start   :   std_logic;
+    stop    :   std_logic;
+end record t_control;
+
+constant INIT_CONTROL_DISABLED      :   t_control       :=  (enable =>  '0',
+                                                             start  =>  '0',
+                                                             stop   =>  '0');
+
+constant INIT_CONTROL_ENABLED       :   t_control       :=  (enable =>  '1',
+                                                             start  =>  '0',
+                                                             stop   =>  '0');
+
+type t_module_status is record
+    running :   std_logic;
+    done    :   std_logic;
+end record t_module_status;
 	
+constant INIT_MODULE_STATUS     :   t_module_status :=  (running    =>  '0',
+                                                         done       =>  '0');
 end CustomDataTypes;
 
 --------------------------------------------------------------------------------------------------
