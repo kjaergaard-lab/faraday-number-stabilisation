@@ -1,6 +1,7 @@
 classdef DPFeedbackClient < handle
     properties
         client
+        host
     end
     
     properties(SetAccess = protected)
@@ -17,12 +18,17 @@ classdef DPFeedbackClient < handle
     end
     
     methods
-        function self = DPFeedbackClient
+        function self = DPFeedbackClient(host)
+            if nargin==1
+                self.host = host;
+            else
+                self.host = self.HOST_ADDRESS;
+            end
             self.initRead;
         end
         
         function open(self)
-            self.client = tcpclient(self.HOST_ADDRESS,self.TCP_PORT,'Timeout',1,'ConnectTimeout',1);
+            self.client = tcpclient(self.host,self.TCP_PORT,'Timeout',1,'ConnectTimeout',1);
         end
         
         function close(self)

@@ -1,0 +1,7 @@
+
+*.xpr
+*power-measurement*/
+!power-measurement.srcs/
+power-measurement.srcs/sources_1/bd/
+power-measurement.srcs/sources_1/ip/*/*
+!power-measurement.srcs/sources_1/ip/**/*.xci
