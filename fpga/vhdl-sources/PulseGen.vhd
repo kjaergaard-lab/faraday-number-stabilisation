@@ -95,6 +95,7 @@ begin
                     if count < delay then
                         count <= count + 1;
                     else
+                        count <= to_unsigned(1,count'length);
                         pulse_o <= '1';
                         state <= pulsing;
                     end if;
@@ -109,12 +110,13 @@ begin
                     else
                         count <= to_unsigned(1,count'length);
                         state <= incrementing;
+                        pulseCount <= pulseCount + 1;
                     end if;
                     
                 when incrementing =>
                     if pulseCount < numPulses then
                         state <= pulsing;
-                        pulseCount <= pulseCount + 1;
+--                        pulseCount <= pulseCount + 1;
                         pulse_o <= '1';
                     else
                         state <= idle;

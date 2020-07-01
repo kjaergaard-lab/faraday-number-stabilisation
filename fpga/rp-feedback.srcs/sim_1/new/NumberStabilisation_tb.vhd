@@ -99,11 +99,11 @@ begin
     quadTarget <= std_logic_vector(to_unsigned(100000,quadTarget'length));
     quadTol <= std_logic_vector(to_unsigned(5250,quadTol'length));
     
-    numPulsesMW <= std_logic_vector(to_unsigned(10,numPulsesMW'length));
+    numPulsesMW <= std_logic_vector(to_unsigned(2,numPulsesMW'length));
     pulsePeriodMW <= std_logic_vector(to_unsigned(10,pulsePeriodMW'length));
     pulseWidthMW <= std_logic_vector(to_unsigned(2,pulseWidthMW'length));
     
-    auxReg0 <= (0 => '0', others => '0');
+    auxReg0 <= (0 => '1', others => '0');
     
     wait for 50 ns;
     computeReg0 <= quadTarget(15 downto 0) & numPulses0;
@@ -113,7 +113,7 @@ begin
     
     pulseReg0 <= numPulsesMW & pulseWidthMW;
     pulseReg1 <= pulsePeriodMW;
-    cntrl_i <= (start => '0', stop => '0', enable => '1', debug => (others => '0'));
+    cntrl_i <= (start => '0', stop => '0', enable => '0', debug => (others => '0'));
 
     wait for 50 ns;
     aresetn <= '1';

@@ -25,6 +25,7 @@ component DispersiveProbing is
         
         pulseReg0       :   in  t_param_reg;
         pulseReg1       :   in  t_param_reg;
+        pulseReg2       :   in  t_param_reg;
         avgReg0         :   in  t_param_reg;
         integrateReg0   :   in  t_param_reg;
         auxReg0         :   in  t_param_reg;
@@ -48,7 +49,7 @@ signal adcData_i                :   std_logic_vector(31 downto 0)   :=  (others 
 signal mem_bus_masters          :   t_mem_bus_master_array(1 downto 0)  :=  (others => INIT_MEM_BUS_MASTER);
 signal mem_bus_slaves           :   t_mem_bus_slave_array(1 downto 0)   :=  (others => INIT_MEM_BUS_SLAVE);
 
-signal pulseReg0, pulseReg1, avgReg0, integrateReg0, auxReg0 :   t_param_reg :=  (others => '0');
+signal pulseReg0, pulseReg1, pulseReg2, avgReg0, integrateReg0, auxReg0 :   t_param_reg :=  (others => '0');
 signal quadSignal       :   unsigned(QUAD_WIDTH-1 downto 0);
 signal quadValid        :   std_logic;
 signal pulse, shutter   :   std_logic   :=  '0';
@@ -72,6 +73,7 @@ port map(
 
     pulseReg0       =>  pulseReg0,
     pulseReg1       =>  pulseReg1,
+    pulseReg2       =>  pulseReg2,
     avgReg0         =>  avgReg0,
     integrateReg0   =>  integrateReg0,
     auxReg0         =>  auxReg0,
@@ -100,12 +102,13 @@ adcData_i <= X"00030004" when pulse = '1' else (others => '0');
 tb: process is
 begin
     aresetn <= '0';
-    pulseReg0 <= X"000a" & X"0008";
+    pulseReg0 <= X"0002" & X"0008";
     pulseReg1 <= X"000001F4";
+    pulseReg2 <= (others => '0');
     avgReg0 <= X"0" & std_logic_vector(to_unsigned(100,14)) & std_logic_vector(to_unsigned(0,14));
     integrateReg0 <= X"00" & X"05" & X"10" & X"01";
     pow_i <= to_unsigned(5,pow_i'length);
-    auxReg0 <= (0 => '1', others => '0');
+    auxReg0 <= (0 => '0', others => '0');
     cntrl_i <= INIT_CONTROL_ENABLED; 
     wait for 50 ns;
     aresetn <= '1';
