@@ -85,6 +85,8 @@ begin
         divValid_i <= '0';
         valid_o <= '0';
         validSave_o <= '0';
+        dataI_o <= (others => '0');
+        dataQ_o <= (others => '0');
     elsif rising_edge(adcClk) then
         SumDiffFSM: case(state) is
             when idle =>
@@ -137,8 +139,7 @@ begin
                 dataSave_o <= std_logic_vector(resize(adc2,dataSave_o'length));
                 validSave_o <= '1';
                 state <= idle;
-                
-        
+
             when others => state <= idle;
         end case;
     end if;

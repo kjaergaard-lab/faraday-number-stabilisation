@@ -9,7 +9,7 @@ entity topmod is
     port (
         sysClk          :   in  std_logic;
         aresetn         :   in  std_logic;
-        trig_i          :   in  std_logic;
+        ext_i           :   in  std_logic_vector(7 downto 0);
 
         addr_i          :   in  unsigned(AXI_ADDR_WIDTH-1 downto 0);            --Address out
         writeData_i     :   in  std_logic_vector(AXI_DATA_WIDTH-1 downto 0);    --Data to write
@@ -98,7 +98,7 @@ signal mem_bus_s    :   t_mem_bus_slave_array(1 downto 0)     :=  (others => INI
 
 begin
 
-powerCntrl.start <= trig_i;
+powerCntrl.start <= ext_i(2);
 
 MeasPower: PowerMeasurement
 port map(
@@ -144,7 +144,7 @@ port map(
     busy        =>  open
 );
 
-ext_o(0) <= TxD;
+ext_o(2) <= TxD;
 
 
 --
@@ -186,24 +186,31 @@ begin
                                 mem_bus_m(1).reset <= '1';
                                 
                             when X"000004" => rw(bus_m,bus_s,comState,sharedReg0);
---                            when X"000008" => 
---                            when X"00000C" => 
-                            when X"000010" => rw(bus_m,bus_s,comState,avgReg0);
-                            when X"000014" => readOnly(bus_m,bus_s,comState,mem_bus_s(0).last);
-                            when X"000018" => rw(bus_m,bus_s,comState,integrateReg0);
-                            when X"00001C" => readOnly(bus_m,bus_s,comState,mem_bus_s(1).last);
+                            when X"000008" => rw(bus_m,bus_s,comState,avgReg0);
+                            when X"00000C" => rw(bus_m,bus_s,comState,integrateReg0);
 
                             
                             when others => 
                                 comState <= finishing;
                                 bus_s.resp <= "11";
-                        end case;            
+                        end case;  
+                    --
+                    -- Read-only properties
+                    --
+                    when X"01" =>
+                        ReadOnlyCase: case(bus_m.addr(23 downto 0)) is
+                            when X"000000" => readOnly(bus_m,bus_s,comState,mem_bus_s(0).last);
+                            when X"000004" => readOnly(bus_m,bus_s,comState,mem_bus_s(1).last);
+                            when others => 
+                                comState <= finishing;
+                                bus_s.resp <= "11";
+                        end case;  
                     --
                     -- Read raw/averaged data
                     -- 
                     -- When the address starts with X"01", then we read from or write to memory
                     --
-                    when X"01" =>
+                    when X"02" =>
                         if bus_m.valid(1) = '0' then
                             bus_s.resp <= "11";
                             comState <= finishing;
@@ -227,7 +234,7 @@ begin
                     -- 
                     -- When the address starts with X"02", then we read from or write to memory
                     --
-                    when X"02" =>
+                    when X"03" =>
                         if bus_m.valid(1) = '0' then
                             bus_s.resp <= "11";
                             comState <= finishing;
@@ -247,7 +254,9 @@ begin
                             mem_bus_m(1).trig <= '0';
                         end if;
                     
-                    when others => null;
+                    when others => 
+                        comState <= finishing;
+                        bus_s.resp <= "11";
                 end case;
             when finishing =>
                 triggers <= (others => '0');

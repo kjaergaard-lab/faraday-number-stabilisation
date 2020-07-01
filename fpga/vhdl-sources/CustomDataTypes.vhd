@@ -4,10 +4,17 @@ use ieee.numeric_std.ALL;
 use ieee.std_logic_unsigned.all; 
 
 --
--- This package contains both constants and functions used for
--- servo control.
+-- This package contains both constants and data types
 --
 package CustomDataTypes is
+
+--
+-- Constants
+--
+constant QUAD_BARE_WIDTH    :   natural :=  24;
+constant QUAD_FRAC_WIDTH    :   natural :=  16;
+constant QUAD_WIDTH         :   natural :=  QUAD_BARE_WIDTH + QUAD_FRAC_WIDTH;
+constant PULSE_NUM_WIDTH    :   natural :=  16;
 
 subtype t_param_reg is std_logic_vector(31 downto 0);
 subtype t_adc_combined is std_logic_vector(31 downto 0);
@@ -70,15 +77,18 @@ type t_control is record
     enable  :   std_logic;
     start   :   std_logic;
     stop    :   std_logic;
+    debug   :   std_logic_vector(3 downto 0);
 end record t_control;
 
 constant INIT_CONTROL_DISABLED      :   t_control       :=  (enable =>  '0',
                                                              start  =>  '0',
-                                                             stop   =>  '0');
+                                                             stop   =>  '0',
+                                                             debug  =>  (others => '0'));
 
 constant INIT_CONTROL_ENABLED       :   t_control       :=  (enable =>  '1',
                                                              start  =>  '0',
-                                                             stop   =>  '0');
+                                                             stop   =>  '0',
+                                                             debug  =>  (others => '0'));
 
 type t_module_status is record
     running :   std_logic;

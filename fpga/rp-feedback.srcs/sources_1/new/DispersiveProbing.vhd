@@ -13,16 +13,21 @@ entity DispersiveProbing is
 
         cntrl_i         :   in  t_control;
         adcData_i       :   in  t_adc_combined;
-
+        
+        pow_i           :   in  unsigned(23 downto 0);
+        powValid_i      :   in  std_logic;
+        
         pulseReg0       :   in  t_param_reg;
         pulseReg1       :   in  t_param_reg;
+        pulseReg2       :   in  t_param_reg;
         avgReg0         :   in  t_param_reg;
         integrateReg0   :   in  t_param_reg;
+        auxReg0         :   in  t_param_reg;
 
         bus_m           :   in  t_mem_bus_master_array(1 downto 0);
         bus_s           :   out t_mem_bus_slave_array(1 downto 0);
 
-        quad_o          :   out unsigned(23 downto 0);
+        quad_o          :   out unsigned(QUAD_WIDTH-1 downto 0);
         valid_o         :   out std_logic;
         pulse_o         :   out std_logic;
         shutter_o       :   out std_logic
@@ -34,14 +39,14 @@ architecture Behavioral of DispersiveProbing is
 component PulseGen is
     port(
         clk         :   in  std_logic;
-        aresetn     :   in  std_logic;
+        aresetn     :   in  std_logic;  
         cntrl_i     :   in  t_control;
         
         reg0        :   in  t_param_reg;
         reg1        :   in  t_param_reg;
+        reg2        :   in  t_param_reg;
         
         pulse_o     :   out std_logic;
-        gate_o      :   out std_logic;
         status_o    :   out t_module_status
     );
 end component;    
@@ -93,7 +98,11 @@ component ComputeSignal is
         dataQ_i     :   in  signed(23 downto 0);
         valid_i     :   in  std_logic;
         
-        quad_o      :   out unsigned(23 downto 0);
+        pow_i       :   in  unsigned(23 downto 0);
+        powValid_i  :   in  std_logic;
+        usePow_i    :   in  std_logic;
+        
+        quad_o      :   out unsigned(QUAD_WIDTH-1 downto 0);
         valid_o     :   out std_logic
     );
 end component;
@@ -113,7 +122,7 @@ component SaveADCData is
 end component;
 
 
-signal pulse, pulseGate    :   std_logic   :=  '0';
+signal pulse        :   std_logic   :=  '0';
 signal pulseStatus  :   t_module_status :=  INIT_MODULE_STATUS;
 signal adcAvg   :   t_adc_combined  :=  (others => '0');
 signal validAvg :   std_logic;
@@ -123,8 +132,12 @@ signal validIntegrate   :   std_logic   :=  '0';
 signal intSave      :   t_mem_data;
 signal intSaveValid :   std_logic;
 
-signal quadSignal   :   unsigned(23 downto 0);
+signal quadSignal   :   unsigned(QUAD_WIDTH-1 downto 0);
 signal validQuad    :   std_logic   :=  '0';
+
+signal usePow       :   std_logic   :=  '1';
+
+signal shutterDelay, count :   unsigned(23 downto 0)    :=  (others => '0');
 
 begin
 
@@ -135,8 +148,8 @@ port map(
     cntrl_i =>  cntrl_i,
     reg0    =>  pulseReg0,
     reg1    =>  pulseReg1,
+    reg2    =>  pulseReg2,
     pulse_o =>  pulse,
-    gate_o  =>  pulseGate,
     status_o=>  pulseStatus
 );
 pulse_o <= pulse;
@@ -172,6 +185,8 @@ port map(
     validSave_o =>  intSaveValid
 );
 
+usePow <= auxReg0(0);
+
 Compute: ComputeSignal
 port map(
     adcClk      =>  adcClk,
@@ -179,6 +194,9 @@ port map(
     dataI_i     =>  dataI,
     dataQ_i     =>  dataQ,
     valid_i     =>  validIntegrate,
+    pow_i       =>  pow_i,
+    powValid_i  =>  powValid_i,
+    usePow_i    =>  usePow,
     quad_o      =>  quadSignal,
     valid_o     =>  validQuad
 );

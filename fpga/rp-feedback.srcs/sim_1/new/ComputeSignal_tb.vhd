@@ -20,6 +20,10 @@ component ComputeSignal is
         dataQ_i     :   in  signed(23 downto 0);
         valid_i     :   in  std_logic;
         
+        pow_i       :   in  unsigned(23 downto 0);
+        powValid_i  :   in  std_logic;
+        usePow_i    :   in  std_logic;
+        
         quad_o      :   out unsigned(23 downto 0);
         valid_o     :   out std_logic
     );
@@ -29,20 +33,24 @@ constant clkPeriod  :   time    :=  10 ns;
 
 signal adcClk, aresetn   :   std_logic  :=  '0';
 signal dataI_i, dataQ_i  :   signed(23 downto 0)   :=  (others => '0');
-signal valid_i, valid_o  :   std_logic   :=  '0';
-signal quad_o   :   unsigned(23 downto 0)   :=  (others => '0');
+signal valid_i, valid_o, powValid_i, usePow_i  :   std_logic   :=  '0';
+signal quad_o, pow_i   :   unsigned(23 downto 0)   :=  (others => '0');
+
 
 begin
 
 uut: ComputeSignal
 port map(
-    adcClk =>  adcClk,
-    aresetn =>  aresetn,
-    dataI_i => dataI_i,
-    dataQ_i => dataQ_i,
-    valid_i => valid_i,
-    quad_o => quad_o,
-    valid_o =>  valid_o
+    adcClk      =>  adcClk,
+    aresetn     =>  aresetn,
+    dataI_i     => dataI_i,
+    dataQ_i     => dataQ_i,
+    valid_i     => valid_i,
+    pow_i       =>  pow_i,
+    powValid_i  =>  powValid_i,
+    usePow_i    =>  usePow_i,
+    quad_o      => quad_o,
+    valid_o     =>  valid_o
 );
 
 -- Clock process definitions
@@ -65,8 +73,16 @@ begin
     valid_i <= '1';
     dataI_i <= to_signed(1300,dataI_i'length);
     dataQ_i <= to_signed(-6798,dataQ_i'length);
+    pow_i <= to_unsigned(1000,pow_i'length);
+    usePow_i <= '1';
+    powValid_i <= '0';
     wait until adcClk'event and adcClk = '1';
     valid_i <= '0';
+    wait for 100*clkPeriod;
+    wait until adcClk'event and adcClk = '1';
+    powValid_i <= '1';
+    wait until adcClk'event and adcClk = '1';
+    powValid_i <= '0';
     wait for 100*clkPeriod;
     wait;
     

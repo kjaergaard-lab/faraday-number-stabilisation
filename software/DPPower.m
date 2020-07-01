@@ -36,7 +36,7 @@ classdef DPPower < handle
     properties(Constant)
         CLK = 125e6;
         MAX_SUM_RANGE = 2^8-1;
-        HOST_ADDRESS = '172.22.250.94';
+        HOST_ADDRESS = '172.22.250.189';
     end
     
     methods
@@ -50,10 +50,11 @@ classdef DPPower < handle
             self.trigReg0 = DPFeedbackRegister('0',self.conn);
             self.sharedReg0 = DPFeedbackRegister('4',self.conn);
 
-            self.avgReg0 = DPFeedbackRegister('10',self.conn);
-            self.sampleReg0 = DPFeedbackRegister('14',self.conn);
-            self.integrateReg0 = DPFeedbackRegister('18',self.conn);
-            self.numpulseReg0 = DPFeedbackRegister('1C',self.conn);
+            self.avgReg0 = DPFeedbackRegister('8',self.conn);
+            self.integrateReg0 = DPFeedbackRegister('C',self.conn);
+            
+            self.sampleReg0 = DPFeedbackRegister('01000000',self.conn);
+            self.numpulseReg0 = DPFeedbackRegister('01000004',self.conn);
             
             %Initial processing
             self.delay = DPFeedbackParameter([0,13],self.avgReg0)...
@@ -135,6 +136,20 @@ classdef DPPower < handle
             %Get number of collected samples
             self.samplesCollected.read;
             self.numpulses.read;
+            
+        end
+        
+        function self = copyfb(self,fb)
+            if isa(fb,'DPFeedback')
+                self.log2Avgs.set(fb.log2Avgs.value);
+                self.delay.set(fb.delay.value);
+                self.samplesPerPulse.set(fb.samplesPerPulse.value);
+                self.sumStart.set(fb.sumStart.value);
+                self.subStart.set(fb.subStart.value);
+                self.sumWidth.set(fb.sumWidth.value);
+            else
+                error('Input must be a DPFeedback object');
+            end
             
         end
         

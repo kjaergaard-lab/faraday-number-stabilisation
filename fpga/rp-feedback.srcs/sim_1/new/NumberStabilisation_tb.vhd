@@ -21,16 +21,18 @@ component NumberStabilisation is
         computeReg0     :   in  t_param_reg;
         computeReg1     :   in  t_param_reg;
         computeReg2     :   in  t_param_reg;
+        computeReg3     :   in  t_param_reg;
         
         pulseReg0       :   in  t_param_reg;
         pulseReg1       :   in  t_param_reg;
         
-        quad_i          :   in  unsigned(23 downto 0);
+        auxReg0         :   in  t_param_reg;
+        
+        quad_i          :   in  unsigned(QUAD_WIDTH-1 downto 0);
         valid_i         :   in  std_logic;
         
         cntrl_o         :   out t_control;
         pulse_o         :   out std_logic
-        
     );
 end component;
 
@@ -38,16 +40,16 @@ constant clkPeriod  :   time    :=  10 ns;
 
 signal sysClk, adcClk, aresetn  :   std_logic  :=  '0';
 
-signal computeReg0, computeReg1, computeReg2, pulseReg0, pulseReg1   :   t_param_reg :=  (others => '0');
-signal quad_i       :   unsigned(23 downto 0)   :=  (others => '0');
+signal computeReg0, computeReg1, computeReg2, computeReg3, pulseReg0, pulseReg1, auxReg0   :   t_param_reg :=  (others => '0');
+signal quad_i       :   unsigned(QUAD_WIDTH-1 downto 0)   :=  (others => '0');
 signal valid_i, pulse_o      :  std_logic   :=  '0';
 signal cntrl_i, cntrl_o :   t_control   :=  INIT_CONTROL_ENABLED;
 
-signal numPulses0   :   std_logic_vector(15 downto 0);
-signal quadTarget   :   std_logic_vector(39 downto 0);
-signal quadTol      :   std_logic_vector(23 downto 0);
-signal numPulsesMW  :   std_logic_vector(15 downto 0);
-signal pulseWidthMW :   std_logic_vector(15 downto 0);
+signal numPulses0   :   std_logic_vector(PULSE_NUM_WIDTH-1 downto 0);
+signal quadTarget   :   std_logic_vector(QUAD_WIDTH+PULSE_NUM_WIDTH-1 downto 0);
+signal quadTol      :   std_logic_vector(QUAD_WIDTH-1 downto 0);
+signal numPulsesMW  :   std_logic_vector(PULSE_NUM_WIDTH-1 downto 0);
+signal pulseWidthMW :   std_logic_vector(PULSE_NUM_WIDTH-1 downto 0);
 signal pulsePeriodMW:   std_logic_vector(31 downto 0);
 
 begin
@@ -62,9 +64,12 @@ port map(
     computeReg0 =>  computeReg0,
     computeReg1 =>  computeReg1,
     computeReg2 =>  computeReg2,
+    computeReg3 =>  computeReg3,
     
     pulseReg0   =>  pulseReg0,
     pulseReg1   =>  pulseReg1,
+    
+    auxReg0     =>  auxReg0,
     
     quad_i      =>  quad_i,
     valid_i     =>  valid_i,
@@ -98,15 +103,17 @@ begin
     pulsePeriodMW <= std_logic_vector(to_unsigned(10,pulsePeriodMW'length));
     pulseWidthMW <= std_logic_vector(to_unsigned(2,pulseWidthMW'length));
     
+    auxReg0 <= (0 => '0', others => '0');
+    
     wait for 50 ns;
     computeReg0 <= quadTarget(15 downto 0) & numPulses0;
-    computeReg1(23 downto 0) <= quadTarget(quadTarget'length-1 downto 16);
-    computeReg2(23 downto 0) <= quadTol;
-    computeReg2(31) <= '1';
+    computeReg1 <= quadTarget(quadTarget'length-8-1 downto 16);
+    computeReg2 <= quadTol(23 downto 0) & quadTarget(quadTarget'length-1 downto quadTarget'length-8);
+    computeReg3(15 downto 0) <= quadTol(39 downto 24);
     
     pulseReg0 <= numPulsesMW & pulseWidthMW;
     pulseReg1 <= pulsePeriodMW;
-    cntrl_i <= (start => '0', stop => '0', enable => '0');
+    cntrl_i <= (start => '0', stop => '0', enable => '1', debug => (others => '0'));
 
     wait for 50 ns;
     aresetn <= '1';

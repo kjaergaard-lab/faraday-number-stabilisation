@@ -14,7 +14,11 @@ entity ComputeSignal is
         dataQ_i     :   in  signed(23 downto 0);
         valid_i     :   in  std_logic;
         
-        quad_o      :   out unsigned(23 downto 0);
+        pow_i       :   in  unsigned(23 downto 0);
+        powValid_i  :   in  std_logic;
+        usePow_i    :   in  std_logic;
+        
+        quad_o      :   out unsigned(QUAD_WIDTH-1 downto 0);
         valid_o     :   out std_logic
     );
 end ComputeSignal;
@@ -40,16 +44,34 @@ COMPONENT SquareRoot48
   );
 END COMPONENT;
 
-type t_status_local is (idle,multiplying,rooting);
+COMPONENT PowDivider
+  PORT (
+    aclk : IN STD_LOGIC;
+    s_axis_divisor_tvalid : IN STD_LOGIC;
+    s_axis_divisor_tready : OUT STD_LOGIC;
+    s_axis_divisor_tdata : IN STD_LOGIC_VECTOR(23 DOWNTO 0);
+    s_axis_dividend_tvalid : IN STD_LOGIC;
+    s_axis_dividend_tready : OUT STD_LOGIC;
+    s_axis_dividend_tdata : IN STD_LOGIC_VECTOR(23 DOWNTO 0);
+    m_axis_dout_tvalid : OUT STD_LOGIC;
+    m_axis_dout_tdata : OUT STD_LOGIC_VECTOR(QUAD_WIDTH-1 DOWNTO 0)
+  );
+END COMPONENT;
+
+type t_status_local is (idle,multiplying,rooting,waiting,dividing);
 
 constant MULT_LATENCY   :   natural :=  4;
 constant SQRT_LATENCY   :   natural :=  13; 
+constant DIV_LATENCY    :   natural :=  50;
 
-signal count    :   natural range 0 to 31   :=  0;
+signal count    :   natural range 0 to 63   :=  0;
 signal I2, Q2   :   std_logic_vector(47 downto 0)   :=  (others => '0');
 signal iqSum    :   unsigned(47 downto 0)   :=  (others => '0');
 signal quad         :   std_logic_vector(31 downto 0);
 signal quad_valid   :   std_logic;
+
+signal quadDiv, powDiv  :   std_logic_vector(QUAD_BARE_WIDTH-1 downto 0)   :=  (others => '0');
+signal div_o    :   std_logic_vector(QUAD_WIDTH-1 downto 0)   :=  (others => '0');
 
 signal state    :   t_status_local  :=  idle;
 
@@ -82,6 +104,19 @@ port map(
     m_axis_dout_tdata => quad
 );
 
+ComputePowDivision : PowDivider
+  PORT MAP (
+    aclk                    => adcClk,
+    s_axis_divisor_tvalid   => '1',
+    s_axis_divisor_tready   => open,
+    s_axis_divisor_tdata    => powDiv,
+    s_axis_dividend_tvalid  => '1',
+    s_axis_dividend_tready  => open,
+    s_axis_dividend_tdata   => quadDiv,
+    m_axis_dout_tvalid      => open,
+    m_axis_dout_tdata       => div_o
+  );
+
 MainProc: process(adcClk,aresetn) is
 begin
     if aresetn = '0' then
@@ -89,6 +124,8 @@ begin
         state <= idle;
         valid_o <= '0';
         quad_o <= (others => '0');
+        quadDiv <= (others => '0');
+        powDiv <= (0 => '1', others => '0');
     elsif rising_edge(adcClk) then
         FSM: case (state) is
             when idle =>
@@ -109,9 +146,29 @@ begin
             when rooting =>
                 if count < SQRT_LATENCY - 2 then
                     count <= count + 1;
+                elsif usePow_i = '0' then
+                    count <= 0;
+                    quad_o <= shift_left(resize(unsigned(quad(QUAD_BARE_WIDTH-1 downto 0)),QUAD_WIDTH),QUAD_FRAC_WIDTH);
+                    valid_o <= '1';
+                    state <= idle;
+                elsif usePow_i = '1' then
+                    count <= 0;
+                    state <= waiting;
+                end if;
+                
+            when waiting =>
+                if powValid_i = '1' then
+                    state <= dividing;
+                    quadDiv <= quad(quadDiv'length-1 downto 0);
+                    powDiv <= std_logic_vector(pow_i);
+                end if;
+                
+            when dividing =>
+                if count < DIV_LATENCY then
+                    count <= count + 1;
                 else
                     count <= 0;
-                    quad_o <= unsigned(quad(quad_o'length-1 downto 0));
+                    quad_o <= unsigned(div_o);
                     valid_o <= '1';
                     state <= idle;
                 end if;
@@ -120,7 +177,5 @@ begin
         end case;
     end if;
 end process;
-
-
 
 end Behavioral;

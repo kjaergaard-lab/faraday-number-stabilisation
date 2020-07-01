@@ -66,13 +66,20 @@ begin
 			--
 			when 2 =>
 				TxD <= data(bitCount);
-				if bitCount >= (NUM_BITS - 1) then
-					bitCount <= 0;
-					state <= 0;
-				else
-					bitCount <= bitCount + 1;
-					state <= 1;
-				end if;
+				if bitCount < NUM_BITS+2 then
+				    bitCount <= bitCount + 1;
+				    state <= 1;
+                else
+                    bitCount <= 0;
+                    state <= 0;
+                end if;
+--				if bitCount >= (NUM_BITS - 1) then
+--					bitCount <= 0;
+--					state <= 0;
+--				else
+--					bitCount <= bitCount + 1;
+--					state <= 1;
+--				end if;
 		
 			when others => null;
 		end case;
