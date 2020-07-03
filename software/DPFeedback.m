@@ -192,11 +192,14 @@ classdef DPFeedback < handle
             
             self.maxMWPulses.set(1e4*0.5);
             self.quadTarget.set(2000);
-            self.quadTol.set(2050);
+            self.quadTol.set(0.05);
             
             self.mwNumPulses.set(1e3);
             self.mwPulseWidth.set(2e-6);
             self.mwPulsePeriod.set(50e-6);
+            
+            self.samplesCollected.set(0);
+            self.pulsesCollected.set(0);
         end
         
         function self = check(self)

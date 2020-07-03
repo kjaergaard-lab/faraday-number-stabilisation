@@ -93,6 +93,8 @@ classdef DPPower < handle
             self.sumStart.set(10);
             self.subStart.set(150);
             self.sumWidth.set(50);
+            
+            self.numpulses.set(0);
         end
         
         function self = check(self)            
