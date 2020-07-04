@@ -121,7 +121,9 @@ signal pulseReg0, pulseReg1, pulseReg2, avgReg0, integrateReg0, auxReg0 :   t_pa
 signal quadSignal           :   unsigned(QUAD_WIDTH-1 downto 0);
 signal quadValid            :   std_logic;
 signal pulseDP, shutterDP   :   std_logic   :=  '0';
+signal pulseDPMan, shutterDPMan   :   std_logic   :=  '0';
 signal dpControl_i          :   t_control   :=  INIT_CONTROL_ENABLED;
+signal manualFlag           :   std_logic   :=  '0';
 
 --
 -- Feedback signals
@@ -130,7 +132,7 @@ signal fbControl_i, fbControl_o     :   t_control   :=  INIT_CONTROL_ENABLED;
 signal fbComputeReg0, fbComputeReg1, fbComputeReg2, fbComputeReg3   :   t_param_reg :=  (others => '0');
 signal fbPulseReg0, fbPulseReg1     :   t_param_reg :=  (others => '0');
 signal fbAuxReg0                    :   t_param_reg :=  (others => '0');
-signal pulseMW                      :   std_logic;
+signal pulseMW, pulseMWMan                      :   std_logic;
 
 --
 -- Block memory signals
@@ -206,9 +208,9 @@ port map(
     
 );
 
-ext_o(0) <= pulseDP;
-ext_o(1) <= shutterDP;
-ext_o(2) <= pulseMW;
+ext_o(0) <= pulseDP or not shutterDP when manualFlag = '0' else pulseDPMan;
+ext_o(1) <= shutterDP when manualFlag = '0' else shutterDPMan;
+ext_o(2) <= pulseMW when manualFlag = '0' else pulseMWMan;
 ext_o(3) <= pulseDP;
 
 
@@ -234,6 +236,11 @@ dpControl_i.enable <= sharedReg0(0);
 fbControl_i.enable <= sharedReg0(1);
 auxReg0 <= (0 => sharedReg0(2), others => '0');
 fbAuxReg0 <= (0 => sharedReg0(3), others => '0');
+
+manualFlag <= sharedReg0(31);
+pulseDPMan <= sharedReg0(30);
+shutterDPMan <= sharedReg0(29);
+pulseMWMan <= sharedREg0(28);
 
 mem_bus_m(0).reset <= reset or dpControl_i.start;
 mem_bus_m(1).reset <= reset or dpControl_i.start;
