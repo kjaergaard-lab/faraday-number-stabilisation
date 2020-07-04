@@ -19,7 +19,7 @@ classdef DPFeedback < handle
         width
         numpulses
         period
-        pulseDelay
+        shutterDelay
         
         delay
         samplesPerPulse
@@ -39,6 +39,11 @@ classdef DPFeedback < handle
         
         samplesCollected
         pulsesCollected
+        
+        manualFlag
+        pulseDPMan
+        shutterDPMan
+        pulseMWMan
     end
     
     properties(SetAccess = protected)
@@ -114,7 +119,7 @@ classdef DPFeedback < handle
             self.period = DPFeedbackParameter([0,31],self.pulseReg1)...
                 .setLimits('lower',500e-9,'upper',10)...
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
-            self.pulseDelay = DPFeedbackParameter([0,31],self.pulseReg2)...
+            self.shutterDelay = DPFeedbackParameter([0,31],self.pulseReg2)...
                 .setLimits('lower',0,'upper',10)...
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
             
@@ -169,6 +174,16 @@ classdef DPFeedback < handle
             self.pulsesCollected = DPFeedbackParameter([0,14],self.pulsesReg0)...
                 .setLimits('lower',0,'upper',2^14)...
                 .setFunctions('to',@(x) x,'from',@(x) round(x/2));
+            
+            % Manual settings
+            self.manualFlag = DPFeedbackParameter([31,31],self.sharedReg0)...
+                .setLimits('lower',0,'upper',1);
+            self.pulseDPMan = DPFeedbackParameter([30,30],self.sharedReg0)...
+                .setLimits('lower',0,'upper',1);
+            self.shutterDPMan = DPFeedbackParameter([29,29],self.sharedReg0)...
+                .setLimits('lower',0,'upper',1);
+            self.pulseMWMan = DPFeedbackParameter([28,28],self.sharedReg0)...
+                .setLimits('lower',0,'upper',1);
         end
         
         function self = setDefaults(self,varargin)
@@ -180,7 +195,7 @@ classdef DPFeedback < handle
             self.width.set(1e-6);
             self.numpulses.set(50);
             self.period.set(5e-6);
-            self.pulseDelay.set(10e-3);
+            self.shutterDelay.set(2.5e-3);
             
             self.delay.set(0);
             self.samplesPerPulse.set(250);
@@ -192,11 +207,19 @@ classdef DPFeedback < handle
             
             self.maxMWPulses.set(1e4*0.5);
             self.quadTarget.set(2000);
-            self.quadTol.set(2050);
+            self.quadTol.set(0.05);
             
             self.mwNumPulses.set(1e3);
             self.mwPulseWidth.set(2e-6);
             self.mwPulsePeriod.set(50e-6);
+            
+            self.samplesCollected.set(0);
+            self.pulsesCollected.set(0);
+            
+            self.manualFlag.set(0);
+            self.pulseMWMan.set(0);
+            self.shutterDPMan.set(0);
+            self.pulseMWMan.set(0);
         end
         
         function self = check(self)
@@ -271,7 +294,7 @@ classdef DPFeedback < handle
             self.width.get;
             self.numpulses.get;
             self.period.get;
-            self.pulseDelay.get;
+            self.shutterDelay.get;
             
             self.delay.get;
             self.samplesPerPulse.get;
@@ -292,6 +315,11 @@ classdef DPFeedback < handle
             %Get number of collected samples
             self.samplesCollected.read;
             self.pulsesCollected.read;
+            
+            %Manual signals
+            self.pulseDPMan.get;
+            self.shutterDPMan.get;
+            self.pulseMWMan.get;
             
         end
         
@@ -380,7 +408,7 @@ classdef DPFeedback < handle
             fprintf(1,'\t Pulse Parameters\n');
             fprintf(1,'\t\t       Pulse Width: %.2e s\n',self.width.value);
             fprintf(1,'\t\t      Pulse Period: %.2e s\n',self.period.value);
-            fprintf(1,'\t\t     Shutter Delay: %.2e s\n',self.pulseDelay.value);
+            fprintf(1,'\t\t     Shutter Delay: %.2e s\n',self.shutterDelay.value);
             fprintf(1,'\t\t  Number of pulses: %d\n',self.numpulses.value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Averaging Parameters\n');

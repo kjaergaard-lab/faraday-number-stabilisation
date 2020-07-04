@@ -93,6 +93,8 @@ classdef DPPower < handle
             self.sumStart.set(10);
             self.subStart.set(150);
             self.sumWidth.set(50);
+            
+            self.numpulses.set(0);
         end
         
         function self = check(self)            
@@ -211,7 +213,7 @@ classdef DPPower < handle
         end
         
         function disp(self)
-            fprintf(1,'DPFeedback object with properties:\n');
+            fprintf(1,'DPPower object with properties:\n');
             fprintf(1,'\t Registers\n');
             fprintf(1,'\t\t    sharedReg0: %08x\n',self.sharedReg0.value);
             fprintf(1,'\t\t       avgReg0: %08x\n',self.avgReg0.value);
