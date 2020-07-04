@@ -30,7 +30,8 @@ entity DispersiveProbing is
         quad_o          :   out unsigned(QUAD_WIDTH-1 downto 0);
         valid_o         :   out std_logic;
         pulse_o         :   out std_logic;
-        shutter_o       :   out std_logic
+        shutter_o       :   out std_logic;
+        status_o        :   out t_module_status
     );
 end DispersiveProbing;
 
@@ -137,9 +138,46 @@ signal validQuad    :   std_logic   :=  '0';
 
 signal usePow       :   std_logic   :=  '1';
 
-signal shutterDelay, count :   unsigned(23 downto 0)    :=  (others => '0');
+signal statusCount :   unsigned(23 downto 0)    :=  (others => '0');
+constant SHUTTER_HOLDOFF    :   unsigned(23 downto 0)   :=  to_unsigned(625000,SHUTTER_HOLDOFF'length);
+
+type t_status_local is (idle, counting);
+signal state    :   t_status_local  :=  idle;
 
 begin
+
+StatusProc: process(clk,aresetn) is
+begin
+    if aresetn = '0' then
+        status_o <= INIT_MODULE_STATUS;
+        statusCount <= (others => '0');
+        state <= idle;
+    elsif rising_edge(clk) then
+        FSM: case state is
+            when idle =>
+                statusCount <= (others => '0');
+                status_o.done <= '0';
+                if pulseStatus.started = '1' then
+                    status_o.started = '1';
+                    status_o.running <= '1';
+                elsif pulseStatus.done = '1' then
+                    state <= counting;
+                    status_o.started = '0';
+                else
+                    status_o.started = '0';
+                end if;
+
+            when counting =>
+                if statusCount < SHUTTER_HOLDOFF then
+                    statusCount <= statusCount + 1;
+                else
+                    status_o.done <= '1';
+                    status_o.running <= '0';
+                    state <= idle;
+                end if;
+        end case;
+    end if;
+end process;
 
 Pulses: PulseGen
 port map(

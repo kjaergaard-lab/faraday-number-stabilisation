@@ -91,11 +91,13 @@ constant INIT_CONTROL_ENABLED       :   t_control       :=  (enable =>  '1',
                                                              debug  =>  (others => '0'));
 
 type t_module_status is record
+    started :   std_logic;
     running :   std_logic;
     done    :   std_logic;
 end record t_module_status;
 	
-constant INIT_MODULE_STATUS     :   t_module_status :=  (running    =>  '0',
+constant INIT_MODULE_STATUS     :   t_module_status :=  (started    =>  '0',
+                                                         running    =>  '0',
                                                          done       =>  '0');
 end CustomDataTypes;
 

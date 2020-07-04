@@ -317,6 +317,7 @@ classdef DPFeedback < handle
             self.pulsesCollected.read;
             
             %Manual signals
+            self.manualFlag.get;
             self.pulseDPMan.get;
             self.shutterDPMan.get;
             self.pulseMWMan.get;

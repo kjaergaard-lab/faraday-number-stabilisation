@@ -62,8 +62,8 @@ component DispersiveProbing is
 
         quad_o          :   out unsigned(QUAD_WIDTH-1 downto 0);
         valid_o         :   out std_logic;
-        pulse_o         :   out std_logic;
-        shutter_o       :   out std_logic
+        shutter_o       :   out std_logic;
+        status_o        :   out t_module_status
     );
 end component;
 
@@ -124,6 +124,7 @@ signal pulseDP, shutterDP   :   std_logic   :=  '0';
 signal pulseDPMan, shutterDPMan   :   std_logic   :=  '0';
 signal dpControl_i          :   t_control   :=  INIT_CONTROL_ENABLED;
 signal manualFlag           :   std_logic   :=  '0';
+signal dpStatus             :   t_module_status := INIT_MODULE_STATUS;
 
 --
 -- Feedback signals
@@ -180,7 +181,8 @@ port map(
     quad_o          =>  quadSignal,
     valid_o         =>  quadValid,
     pulse_o         =>  pulseDP,
-    shutter_o       =>  shutterDP
+    shutter_o       =>  shutterDP,
+    status_o        =>  dpStatus
 );
 
 StabiliseNumber: NumberStabilisation
@@ -208,11 +210,10 @@ port map(
     
 );
 
-ext_o(0) <= pulseDP or not shutterDP when manualFlag = '0' else pulseDPMan;
+ext_o(0) <= pulseDP or not dpStatus.running when manualFlag = '0' else pulseDPMan;
 ext_o(1) <= shutterDP when manualFlag = '0' else shutterDPMan;
 ext_o(2) <= pulseMW when manualFlag = '0' else pulseMWMan;
 ext_o(3) <= pulseDP;
-
 
 
 --

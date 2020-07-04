@@ -69,7 +69,7 @@ begin
             pulseCount <= (others => '0');
             state <= idle;
             pulse_o <= '0';
-            status_o <= (running => '0', done => '1');
+            status_o <= (running => '0', done => '1', started => '0');
         else
             FSM: case state is
                 when idle =>
@@ -78,6 +78,7 @@ begin
                     if trig = "01" and cntrl_i.enable = '1' then
                         count <= to_unsigned(1,count'length);
                         status_o.running <= '1';
+                        status_o.started <= '1';
                         if delay = 0 then
                             pulse_o <= '1';
                             state <= pulsing;
@@ -92,6 +93,7 @@ begin
                     end if;
                     
                 when delaying =>
+                    status_o.started <= '0';
                     if count < delay then
                         count <= count + 1;
                     else
@@ -101,6 +103,7 @@ begin
                     end if;
                     
                 when pulsing =>
+                    status_o.started <= '0';
                     if count < width then
                         count <= count + 1;
                         pulse_o <= '1';
@@ -120,7 +123,7 @@ begin
                         pulse_o <= '1';
                     else
                         state <= idle;
-                        status_o <= (running => '0', done => '1');
+                        status_o <= (running => '0', done => '1', started => '0');
                     end if;
                     
                 when others => state <= idle;
