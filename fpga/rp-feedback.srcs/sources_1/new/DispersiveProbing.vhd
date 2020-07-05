@@ -139,32 +139,32 @@ signal validQuad    :   std_logic   :=  '0';
 signal usePow       :   std_logic   :=  '1';
 
 signal statusCount :   unsigned(23 downto 0)    :=  (others => '0');
-constant SHUTTER_HOLDOFF    :   unsigned(23 downto 0)   :=  to_unsigned(625000,SHUTTER_HOLDOFF'length);
+constant SHUTTER_HOLDOFF    :   unsigned(23 downto 0)   :=  to_unsigned(625000,24);
 
 type t_status_local is (idle, counting);
 signal state    :   t_status_local  :=  idle;
 
 begin
 
-StatusProc: process(clk,aresetn) is
+StatusProc: process(sysClk,aresetn) is
 begin
     if aresetn = '0' then
         status_o <= INIT_MODULE_STATUS;
         statusCount <= (others => '0');
         state <= idle;
-    elsif rising_edge(clk) then
+    elsif rising_edge(sysClk) then
         FSM: case state is
             when idle =>
                 statusCount <= (others => '0');
                 status_o.done <= '0';
                 if pulseStatus.started = '1' then
-                    status_o.started = '1';
+                    status_o.started <= '1';
                     status_o.running <= '1';
                 elsif pulseStatus.done = '1' then
                     state <= counting;
-                    status_o.started = '0';
+                    status_o.started <= '0';
                 else
-                    status_o.started = '0';
+                    status_o.started <= '0';
                 end if;
 
             when counting =>
