@@ -7,7 +7,6 @@ use work.AXI_Bus_Package.all;
 
 entity IntegrateADCData is
     generic(
-        PAD         :   natural :=  8;
         EXT_WIDTH   :   natural :=  24
     );
     port(
@@ -47,7 +46,7 @@ END COMPONENT;
 
 type t_status_local is (idle, summing, dividing, finishing, output, saving);
 
-signal sumStart, sumEnd, subStart, subEnd, width, count    :   unsigned(PAD-1 downto 0)    :=  (others => '0');
+signal sumStart, sumEnd, subStart, subEnd, width, count   :   unsigned(10 downto 0)    :=  (others => '0');
 signal adc1, adc1_i, adc2, adc2_i   :   signed(EXT_WIDTH-1 downto 0)    :=  (others => '0');
 signal trig         :   std_logic_vector(1 downto 0)   :=  "00";
 
@@ -57,14 +56,14 @@ signal divI_o, divQ_o   :   std_logic_vector(31 downto 0);
 
 begin
 
-sumStart <= unsigned(reg0(7 downto 0));
-subStart <= unsigned(reg0(15 downto 8));
-width <= unsigned(reg0(23 downto 16));
+sumStart <= unsigned(reg0(10 downto 0));
+subStart <= unsigned(reg0(21 downto 11));
+width <= resize(unsigned(reg0(31 downto 22)),width'length);
 sumEnd <= sumStart + width;
 subEnd <= subStart + width;
 
-adc1_i <= resize(signed(adcData_i(15 downto 0)),EXT_WIDTH);
-adc2_i <= resize(signed(adcData_i(31 downto 16)),EXT_WIDTH);
+adc1_i <= resize(signed(adcData_i(13 downto 0)),EXT_WIDTH);
+adc2_i <= resize(signed(adcData_i(29 downto 16)),EXT_WIDTH);
 
 TrigSync: process(adcClk,aresetn) is
 begin
