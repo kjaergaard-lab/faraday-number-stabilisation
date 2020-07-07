@@ -67,7 +67,7 @@ classdef DPFeedback < handle
     
     properties(Constant)
         CLK = 125e6;
-        MAX_SUM_RANGE = 2^8-1;
+        MAX_SUM_RANGE = 2^11-1;
         HOST_ADDRESS = '172.22.250.94';
     end
     
@@ -368,6 +368,7 @@ classdef DPFeedback < handle
                 self.data(mm,2) = double(typecast(uint8(raw(nn+(4:7))),'int32'));
                 mm = mm+1;
             end
+            self.data = self.data/self.sumWidth.value;
             self.signal = sqrt(self.data(:,1).^2+self.data(:,2).^2);
             
             self.tPulse = self.period.value*(0:(self.pulsesCollected.value-1))';

@@ -63,7 +63,7 @@ classdef dispersivemod < handle
             
             I = abs(Sred).*cos(angle(Sred))-abs(Sblue).*cos(angle(Sblue));
             Q = -abs(Sred).*sin(angle(Sred))+abs(Sblue).*sin(angle(Sblue));
-            if nargout == 1
+            if nargout < 2
                 varargout{1} = abs(Sred-Sblue);
             else
                 varargout = {I,Q};

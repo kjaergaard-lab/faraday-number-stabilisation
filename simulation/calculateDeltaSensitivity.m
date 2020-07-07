@@ -17,7 +17,7 @@ n = N./(2*pi*s.^2).*exp(-r.^2./(2*s^2));
 waists = [400,200,100,50,25]*1e-6;
 clear dp S dS str Psc
 for nn=1:numel(waists)
-    dp(nn) = dispersivemod(waists(nn),10e-6,2*pi*fmod,0.05,2*pi*400e6,2*pi*6e6,780e-9,1000e-6);
+    dp(nn) = dispersivemod(waists(nn),120e-6,2*pi*fmod,0.05,2*pi*2e9,2*pi*6e6,780e-9,1000e-6);
     for mm=1:numel(detuning)
         dp(nn).detuning = 2*pi*detuning(mm);
         S(mm,nn) = dp(nn).signal(r,n);
@@ -32,10 +32,10 @@ dT = (Psc*const.hbar*dp(1).k/(const.mRb*const.c))./(3*N*const.kb);
 
 %%
 figure(128);clf;
-% plot(detuning/1e6,S*1e6,'.-');
-% plot_format('\Delta [MHz]','Signal power [uW]','',10);
-plot(detuning/1e6,S*1e6./(dT*1e6),'.-');
-plot_format('\Delta [MHz]','Signal power to heating rate [uW signal/(uK/s) heating]','',10);
+plot(detuning/1e6,S*1e6,'.-');
+plot_format('\Delta [MHz]','Signal power [uW]','',10);
+% plot(detuning/1e6,S*1e6./(dT*1e6),'.-');
+% plot_format('\Delta [MHz]','Signal power to heating rate [uW signal/(uK/s) heating]','',10);
 
 grid on
 set(gca,'xminorgrid','on','yminorgrid','on')

@@ -79,8 +79,8 @@ signal TxD          :   std_logic           :=  '0';
 --
 -- Shared registers
 --
-signal triggers     :   t_param_reg :=  (others => '0');
-signal sharedReg0   :   t_param_reg :=  (others => '0');
+signal triggers         :   t_param_reg :=  (others => '0');
+signal sharedReg0       :   t_param_reg :=  (others => '0');
 
 --
 -- Dispersive signals
@@ -95,6 +95,10 @@ signal powerValid           :   std_logic;
 --
 signal mem_bus_m    :   t_mem_bus_master_array(1 downto 0)    :=  (others => INIT_MEM_BUS_MASTER);
 signal mem_bus_s    :   t_mem_bus_slave_array(1 downto 0)     :=  (others => INIT_MEM_BUS_SLAVE);
+signal reset        ;   std_logic   := '0';
+signal autoReset        :   std_logic   :=  '0';
+signal autoResetCount   :   unsigned(31 downto 0)   :=  (others => '0');
+constant AUTO_RESET_TIMER   :   unsigned(autoResetCount'length-1 downto 0)  :=  to_unsigned(1250000000,autoResetCount'length);
 
 begin
 
@@ -146,22 +150,44 @@ port map(
 
 ext_o(2) <= TxD;
 
+AutoResetProc: process(sysClk,aresetn) is
+begin
+    if aresetn = '0' then
+        autoReset <= '0';
+        autoResetCount <= (others => '0');
+    elsif rising_edge(sysClk) then
+        if powerCntrl.start = '1' then
+            if autoResetCount >= AUTO_RESET_TIMER then
+                autoReset <= '1';
+            end if;
+            autoResetCount <= (others => '0');
+        elsif autoResetCount < AUTO_RESET_TIMER then
+            autoResetCount <= autoResetCount + 1;
+            autoReset <= '0';
+        else
+            autoReset <= '0';
+        end if;
+    end if;
+end process;
 
 --
 -- Shared registers
 --
---dpControl_i.start <= triggers(0) or trig_i;
---dpControl_i.enable <= sharedReg0(0);
---dpControl_i.stop <= fbControl_o.stop;
---fbControl_i.start <= triggers(1) or trig_i;
---fbControl_i.enable <= sharedReg0(1);
+mem_bus_m(0).reset <= reset or autoReset;
+mem_bus_m(1).reset <= reset or autoReset;
 
 Parse: process(sysClk,aresetn) is
 begin
     if aresetn = '0' then
         comState <= idle;
         bus_s <= INIT_AXI_BUS_SLAVE;
-        mem_bus_m <= (others => INIT_MEM_BUS_MASTER);
+        mem_bus_m(0).addr <= (others => '0');
+        mem_bus_m(0).trig <= '0';
+        mem_bus_m(0).status <= idle;
+        mem_bus_m(1).addr <= (others => '0');
+        mem_bus_m(1).trig <= '0';
+        mem_bus_m(1).status <= idle;
+
         triggers <= (others => '0');
         sharedReg0 <= (others => '0');
     elsif rising_edge(sysClk) then
@@ -182,8 +208,7 @@ begin
                         ParamCase: case(bus_m.addr(23 downto 0)) is
                             when X"000000" => 
                                 rw(bus_m,bus_s,comState,triggers);
-                                mem_bus_m(0).reset <= '1';
-                                mem_bus_m(1).reset <= '1';
+                                reset <= '1';
                                 
                             when X"000004" => rw(bus_m,bus_s,comState,sharedReg0);
                             when X"000008" => rw(bus_m,bus_s,comState,avgReg0);
@@ -260,8 +285,7 @@ begin
                 end case;
             when finishing =>
                 triggers <= (others => '0');
-                mem_bus_m(0).reset <= '0';
-                mem_bus_m(1).reset <= '0';
+                reset <= '0';
                 comState <= idle;
 
             when others => comState <= idle;
