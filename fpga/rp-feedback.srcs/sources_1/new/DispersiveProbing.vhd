@@ -68,7 +68,6 @@ end component;
 
 component IntegrateADCData is
     generic(
-        PAD         :   natural :=  8;
         EXT_WIDTH   :   natural :=  24
     );
     port(
@@ -206,7 +205,6 @@ port map(
 
 Integrate: IntegrateADCData
 generic map(
-    PAD         =>  8,
     EXT_WIDTH   =>  24
 )
 port map(
