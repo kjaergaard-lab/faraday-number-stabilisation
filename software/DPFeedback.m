@@ -67,7 +67,7 @@ classdef DPFeedback < handle
     
     properties(Constant)
         CLK = 125e6;
-        MAX_SUM_RANGE = 2^8-1;
+        MAX_SUM_RANGE = 2^11-1;
         HOST_ADDRESS = '172.22.250.94';
     end
     
