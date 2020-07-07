@@ -197,6 +197,7 @@ classdef DPPower < handle
                 self.data(mm,2) = double(typecast(uint8(raw(nn+(4:7))),'int32'));
                 mm = mm+1;
             end
+            self.data = self.data/self.sumWidth.value;
             self.signal = self.data(:,1);
             
             if nargin==1
