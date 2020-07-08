@@ -214,7 +214,7 @@ classdef DPFeedback < handle
             self.pulsesCollected.set(0);
             
             self.manualFlag.set(0);
-            self.pulseMWMan.set(0);
+            self.pulseDPMan.set(0);
             self.shutterDPMan.set(0);
             self.pulseMWMan.set(0);
         end
