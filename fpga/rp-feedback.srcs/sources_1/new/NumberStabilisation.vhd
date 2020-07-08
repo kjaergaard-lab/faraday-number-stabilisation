@@ -83,6 +83,7 @@ signal pulseReg0_sig    :   t_param_reg :=  (others => '0');
 
 signal enableSoftTrig :   std_logic   :=  '0';
 signal trig :   std_logic   :=  '0';
+signal trigSync :   std_logic_vector(1 downto 0)    :=  (others => '0');
 
 signal pulseCntrl   :   t_control   :=  INIT_CONTROL_ENABLED;
 
@@ -110,12 +111,21 @@ pulseReg0_sig(15 downto 0) <= pulseReg0(15 downto 0);
 pulseReg0_sig(31 downto 16) <= std_logic_vector(numPulses(15 downto 0)) when cntrl_i.enable = '1' else pulseReg0(31 downto 16);
 enableSoftTrig <= auxReg0(0);
 
-TrigSync: process(adcClk,aresetn) is
+TriggerSync: process(adcClk,aresetn) is
+begin
+    if aresetn = '0' then
+        trigSync <= "00";
+    elsif rising_edge(adcClk) then
+        trigSync <= trigSync(0) & cntrl_i.start;
+    end if;
+end process;
+
+TrigCreate: process(adcClk,aresetn) is
 begin
     if aresetn = '0' then
         trig <= '0';
     elsif rising_edge(adcClk) then
-        if trig = '0' and cntrl_i.enable = '0' and enableSoftTrig = '1' and cntrl_i.start = '1' then
+        if trigSync = "01" and cntrl_i.enable = '0' and enableSoftTrig = '1' then
             trig <= '1';
         else
             trig <= '0';

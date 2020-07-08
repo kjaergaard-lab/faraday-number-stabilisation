@@ -95,14 +95,24 @@ signal powerValid           :   std_logic;
 --
 signal mem_bus_m    :   t_mem_bus_master_array(1 downto 0)    :=  (others => INIT_MEM_BUS_MASTER);
 signal mem_bus_s    :   t_mem_bus_slave_array(1 downto 0)     :=  (others => INIT_MEM_BUS_SLAVE);
-signal reset        ;   std_logic   := '0';
+signal reset        :   std_logic   := '0';
 signal autoReset        :   std_logic   :=  '0';
 signal autoResetCount   :   unsigned(31 downto 0)   :=  (others => '0');
 constant AUTO_RESET_TIMER   :   unsigned(autoResetCount'length-1 downto 0)  :=  to_unsigned(1250000000,autoResetCount'length);
+signal trigSync :   std_logic_vector(1 downto 0)    :=  "00";
 
 begin
 
 powerCntrl.start <= ext_i(2);
+
+TriggerSyncProc: process(sysClk,aresetn) is
+begin
+    if aresetn = '0' then
+        trigSync <= "00";
+    elsif rising_edge(sysClk) then
+        trigSync <= trigSync(0) & powerCntrl.start;
+    end if;
+end process;
 
 MeasPower: PowerMeasurement
 port map(
@@ -156,7 +166,7 @@ begin
         autoReset <= '0';
         autoResetCount <= (others => '0');
     elsif rising_edge(sysClk) then
-        if powerCntrl.start = '1' then
+        if trigSync = "01" then
             if autoResetCount >= AUTO_RESET_TIMER then
                 autoReset <= '1';
             end if;
