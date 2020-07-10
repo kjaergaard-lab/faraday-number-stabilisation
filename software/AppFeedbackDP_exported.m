@@ -136,9 +136,9 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
         
         function plotData(app)
             cla(app.UIAxes);
-            plot(app.UIAxes,1:app.fb.samplesPerPulse.value,app.fb.rawI,'.-');
+            plot(app.UIAxes,1:app.fb.samplesPerPulse.value,app.fb.rawI,'b.-');
             hold(app.UIAxes,'on');
-            plot(app.UIAxes,1:app.fb.samplesPerPulse.value,app.fb.rawQ,'.-');
+            plot(app.UIAxes,1:app.fb.samplesPerPulse.value,app.fb.rawQ,'r.-');
             yy = ylim(app.UIAxes);
             plot(app.UIAxes,app.fb.sumStart.value*[1,1],yy,'k--','linewidth',2);
             plot(app.UIAxes,(app.fb.sumStart.value+app.fb.sumWidth.value)*[1,1],yy,'k--','linewidth',2);
@@ -202,6 +202,7 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
                 app.fb = fb;
                 app.pwr = pwr;
             end
+            app.updateFields;
         end
 
         % Value changed function: EnableDispersivePulsesCheckBox
@@ -794,7 +795,8 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
             title(app.UIAxes, 'Raw I/Q Data')
             xlabel(app.UIAxes, 'X')
             ylabel(app.UIAxes, 'Y')
-            app.UIAxes.Position = [10 318 836 324];
+            app.UIAxes.PlotBoxAspectRatio = [1 0.330061349693252 0.330061349693252];
+            app.UIAxes.Position = [0 318 862 324];
 
             % Create UIAxes4
             app.UIAxes4 = uiaxes(app.RawDataTab);
