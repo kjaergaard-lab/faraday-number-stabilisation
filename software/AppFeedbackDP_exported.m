@@ -14,8 +14,8 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
         PulseWidthsEditField            matlab.ui.control.NumericEditField
         PulsePeriodsEditFieldLabel      matlab.ui.control.Label
         PulsePeriodsEditField           matlab.ui.control.NumericEditField
-        NumberofPulsesSpinnerLabel      matlab.ui.control.Label
-        NumberofPulsesSpinner           matlab.ui.control.Spinner
+        EOMDelaysEditFieldLabel         matlab.ui.control.Label
+        EOMDelaysEditField              matlab.ui.control.NumericEditField
         SamplingSettingsPanel           matlab.ui.container.Panel
         AcqDelaysEditFieldLabel         matlab.ui.control.Label
         AcqDelaysEditField              matlab.ui.control.NumericEditField
@@ -70,6 +70,9 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
         DPPulseButton                   matlab.ui.control.StateButton
         ShutterButton                   matlab.ui.control.StateButton
         MWPulseButton                   matlab.ui.control.StateButton
+        EOMButton                       matlab.ui.control.StateButton
+        NumberofPulsesSpinnerLabel      matlab.ui.control.Label
+        NumberofPulsesSpinner           matlab.ui.control.Spinner
         RawDataTab                      matlab.ui.container.Tab
         UIAxes                          matlab.ui.control.UIAxes
         UIAxes4                         matlab.ui.control.UIAxes
@@ -101,6 +104,7 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
             app.PulseWidthsEditField.Value = app.fb.width.value;
             app.PulsePeriodsEditField.Value = app.fb.period.value;
             app.NumberofPulsesSpinner.Value = app.fb.numpulses.value;
+            app.EOMDelaysEditField.Value = app.fb.eomDelay.value;
             
             app.ShutterDelaysEditField.Value = app.fb.shutterDelay.value;
             app.AcqDelaysEditField.Value = app.fb.delay.value;
@@ -130,6 +134,7 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
             app.DPPulseButton.Value = logical(app.fb.pulseDPMan.value);
             app.ShutterButton.Value = logical(app.fb.shutterDPMan.value);
             app.MWPulseButton.Value = logical(app.fb.pulseMWMan.value);
+            app.EOMButton.Value = logical(app.fb.eomMan.value);
             
             results = 0;
         end
@@ -195,6 +200,8 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
             if nargin < 2
                 app.fb = DPFeedback;
                 app.pwr = DPPower;
+                app.fb.setDefaults;
+                app.pwr.setDefaults;
             elseif nargin < 3
                 app.fb = fb;
                 app.pwr = DPPower;
@@ -410,6 +417,18 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
             app.displayPower = value;
             app.plotData;
         end
+
+        % Value changed function: EOMButton
+        function EOMButtonValueChanged(app, event)
+            value = app.EOMButton.Value;
+            app.fb.eomMan.set(value).write;
+        end
+
+        % Value changed function: EOMDelaysEditField
+        function EOMDelaysEditFieldValueChanged(app, event)
+            value = app.EOMDelaysEditField.Value;
+            app.fb.eomDelay.set(value);
+        end
     end
 
     % App initialization and construction
@@ -458,122 +477,122 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
             % Create DispersivePulseSettingsPanel
             app.DispersivePulseSettingsPanel = uipanel(app.SettingsTab);
             app.DispersivePulseSettingsPanel.Title = 'Dispersive Pulse Settings';
-            app.DispersivePulseSettingsPanel.Position = [8 370 230 122];
+            app.DispersivePulseSettingsPanel.Position = [8 346 246 146];
 
             % Create PulseWidthsEditFieldLabel
             app.PulseWidthsEditFieldLabel = uilabel(app.DispersivePulseSettingsPanel);
             app.PulseWidthsEditFieldLabel.HorizontalAlignment = 'right';
-            app.PulseWidthsEditFieldLabel.Position = [26 74 86 22];
+            app.PulseWidthsEditFieldLabel.Position = [26 98 86 22];
             app.PulseWidthsEditFieldLabel.Text = 'Pulse Width [s]';
 
             % Create PulseWidthsEditField
             app.PulseWidthsEditField = uieditfield(app.DispersivePulseSettingsPanel, 'numeric');
             app.PulseWidthsEditField.ValueChangedFcn = createCallbackFcn(app, @PulseWidthsEditFieldValueChanged, true);
-            app.PulseWidthsEditField.Position = [117 74 100 22];
+            app.PulseWidthsEditField.Position = [117 98 100 22];
 
             % Create PulsePeriodsEditFieldLabel
             app.PulsePeriodsEditFieldLabel = uilabel(app.DispersivePulseSettingsPanel);
             app.PulsePeriodsEditFieldLabel.HorizontalAlignment = 'right';
-            app.PulsePeriodsEditFieldLabel.Position = [16 43 90 22];
+            app.PulsePeriodsEditFieldLabel.Position = [16 67 90 22];
             app.PulsePeriodsEditFieldLabel.Text = 'Pulse Period [s]';
 
             % Create PulsePeriodsEditField
             app.PulsePeriodsEditField = uieditfield(app.DispersivePulseSettingsPanel, 'numeric');
             app.PulsePeriodsEditField.ValueChangedFcn = createCallbackFcn(app, @PulsePeriodsEditFieldValueChanged, true);
-            app.PulsePeriodsEditField.Position = [117 43 100 22];
+            app.PulsePeriodsEditField.Position = [117 67 100 22];
 
-            % Create NumberofPulsesSpinnerLabel
-            app.NumberofPulsesSpinnerLabel = uilabel(app.DispersivePulseSettingsPanel);
-            app.NumberofPulsesSpinnerLabel.HorizontalAlignment = 'right';
-            app.NumberofPulsesSpinnerLabel.Position = [1 9 101 22];
-            app.NumberofPulsesSpinnerLabel.Text = 'Number of Pulses';
+            % Create EOMDelaysEditFieldLabel
+            app.EOMDelaysEditFieldLabel = uilabel(app.DispersivePulseSettingsPanel);
+            app.EOMDelaysEditFieldLabel.HorizontalAlignment = 'right';
+            app.EOMDelaysEditFieldLabel.Position = [19 5 83 22];
+            app.EOMDelaysEditFieldLabel.Text = 'EOM Delay [s]';
 
-            % Create NumberofPulsesSpinner
-            app.NumberofPulsesSpinner = uispinner(app.DispersivePulseSettingsPanel);
-            app.NumberofPulsesSpinner.ValueChangedFcn = createCallbackFcn(app, @NumberofPulsesSpinnerValueChanged, true);
-            app.NumberofPulsesSpinner.Position = [117 9 100 22];
+            % Create EOMDelaysEditField
+            app.EOMDelaysEditField = uieditfield(app.DispersivePulseSettingsPanel, 'numeric');
+            app.EOMDelaysEditField.ValueChangedFcn = createCallbackFcn(app, @EOMDelaysEditFieldValueChanged, true);
+            app.EOMDelaysEditField.Position = [117 5 100 22];
 
             % Create SamplingSettingsPanel
             app.SamplingSettingsPanel = uipanel(app.SettingsTab);
             app.SamplingSettingsPanel.Title = 'Sampling Settings';
-            app.SamplingSettingsPanel.Position = [9 80 245 272];
+            app.SamplingSettingsPanel.Position = [9 70 245 268];
 
             % Create AcqDelaysEditFieldLabel
             app.AcqDelaysEditFieldLabel = uilabel(app.SamplingSettingsPanel);
             app.AcqDelaysEditFieldLabel.HorizontalAlignment = 'right';
-            app.AcqDelaysEditFieldLabel.Position = [37 190 76 22];
+            app.AcqDelaysEditFieldLabel.Position = [43 178 76 22];
             app.AcqDelaysEditFieldLabel.Text = 'Acq Delay [s]';
 
             % Create AcqDelaysEditField
             app.AcqDelaysEditField = uieditfield(app.SamplingSettingsPanel, 'numeric');
             app.AcqDelaysEditField.ValueChangedFcn = createCallbackFcn(app, @AcqDelaysEditFieldValueChanged, true);
-            app.AcqDelaysEditField.Position = [128 190 100 22];
+            app.AcqDelaysEditField.Position = [134 178 100 22];
 
             % Create SamplesPerPulseSpinnerLabel
             app.SamplesPerPulseSpinnerLabel = uilabel(app.SamplingSettingsPanel);
             app.SamplesPerPulseSpinnerLabel.HorizontalAlignment = 'right';
-            app.SamplesPerPulseSpinnerLabel.Position = [7 159 108 22];
+            app.SamplesPerPulseSpinnerLabel.Position = [13 147 108 22];
             app.SamplesPerPulseSpinnerLabel.Text = 'Samples Per Pulse';
 
             % Create SamplesPerPulseSpinner
             app.SamplesPerPulseSpinner = uispinner(app.SamplingSettingsPanel);
             app.SamplesPerPulseSpinner.ValueChangedFcn = createCallbackFcn(app, @SamplesPerPulseSpinnerValueChanged, true);
-            app.SamplesPerPulseSpinner.Position = [130 159 100 22];
+            app.SamplesPerPulseSpinner.Position = [136 147 100 22];
 
             % Create Log2OfAvgsSpinnerLabel
             app.Log2OfAvgsSpinnerLabel = uilabel(app.SamplingSettingsPanel);
             app.Log2OfAvgsSpinnerLabel.HorizontalAlignment = 'right';
-            app.Log2OfAvgsSpinnerLabel.Position = [27 125 88 22];
+            app.Log2OfAvgsSpinnerLabel.Position = [33 113 88 22];
             app.Log2OfAvgsSpinnerLabel.Text = 'Log2 # Of Avgs';
 
             % Create Log2OfAvgsSpinner
             app.Log2OfAvgsSpinner = uispinner(app.SamplingSettingsPanel);
             app.Log2OfAvgsSpinner.ValueChangedFcn = createCallbackFcn(app, @Log2OfAvgsSpinnerValueChanged, true);
-            app.Log2OfAvgsSpinner.Position = [130 125 100 22];
+            app.Log2OfAvgsSpinner.Position = [136 113 100 22];
 
             % Create StartofSummationSpinnerLabel
             app.StartofSummationSpinnerLabel = uilabel(app.SamplingSettingsPanel);
             app.StartofSummationSpinnerLabel.HorizontalAlignment = 'right';
-            app.StartofSummationSpinnerLabel.Position = [7 89 108 22];
+            app.StartofSummationSpinnerLabel.Position = [13 77 108 22];
             app.StartofSummationSpinnerLabel.Text = 'Start of Summation';
 
             % Create StartofSummationSpinner
             app.StartofSummationSpinner = uispinner(app.SamplingSettingsPanel);
             app.StartofSummationSpinner.ValueChangedFcn = createCallbackFcn(app, @StartofSummationSpinnerValueChanged, true);
-            app.StartofSummationSpinner.Position = [130 89 100 22];
+            app.StartofSummationSpinner.Position = [136 77 100 22];
 
             % Create StartofSubractionSpinnerLabel
             app.StartofSubractionSpinnerLabel = uilabel(app.SamplingSettingsPanel);
             app.StartofSubractionSpinnerLabel.HorizontalAlignment = 'right';
-            app.StartofSubractionSpinnerLabel.Position = [10 54 105 22];
+            app.StartofSubractionSpinnerLabel.Position = [16 42 105 22];
             app.StartofSubractionSpinnerLabel.Text = 'Start of Subraction';
 
             % Create StartofSubractionSpinner
             app.StartofSubractionSpinner = uispinner(app.SamplingSettingsPanel);
             app.StartofSubractionSpinner.ValueChangedFcn = createCallbackFcn(app, @StartofSubractionSpinnerValueChanged, true);
-            app.StartofSubractionSpinner.Position = [130 54 100 22];
+            app.StartofSubractionSpinner.Position = [136 42 100 22];
 
             % Create SumSubwidthSpinnerLabel
             app.SumSubwidthSpinnerLabel = uilabel(app.SamplingSettingsPanel);
             app.SumSubwidthSpinnerLabel.HorizontalAlignment = 'right';
-            app.SumSubwidthSpinnerLabel.Position = [29 20 86 22];
+            app.SumSubwidthSpinnerLabel.Position = [35 8 86 22];
             app.SumSubwidthSpinnerLabel.Text = 'Sum/Sub width';
 
             % Create SumSubwidthSpinner
             app.SumSubwidthSpinner = uispinner(app.SamplingSettingsPanel);
             app.SumSubwidthSpinner.ValueChangedFcn = createCallbackFcn(app, @SumSubwidthSpinnerValueChanged, true);
-            app.SumSubwidthSpinner.Position = [130 20 100 22];
+            app.SumSubwidthSpinner.Position = [136 8 100 22];
 
             % Create ShutterDelaysEditFieldLabel
             app.ShutterDelaysEditFieldLabel = uilabel(app.SamplingSettingsPanel);
             app.ShutterDelaysEditFieldLabel.HorizontalAlignment = 'right';
-            app.ShutterDelaysEditFieldLabel.Position = [17 222 94 22];
+            app.ShutterDelaysEditFieldLabel.Position = [25 210 94 22];
             app.ShutterDelaysEditFieldLabel.Text = 'Shutter Delay [s]';
 
             % Create ShutterDelaysEditField
             app.ShutterDelaysEditField = uieditfield(app.SamplingSettingsPanel, 'numeric');
             app.ShutterDelaysEditField.ValueChangedFcn = createCallbackFcn(app, @ShutterDelaysEditFieldValueChanged, true);
-            app.ShutterDelaysEditField.Position = [126 222 100 22];
+            app.ShutterDelaysEditField.Position = [134 210 100 22];
 
             % Create FeedbackSettingsPanel
             app.FeedbackSettingsPanel = uipanel(app.SettingsTab);
@@ -725,66 +744,83 @@ classdef AppFeedbackDP_exported < matlab.apps.AppBase
             % Create CalculatedValuesPanel
             app.CalculatedValuesPanel = uipanel(app.SettingsTab);
             app.CalculatedValuesPanel.Title = 'Calculated Values';
-            app.CalculatedValuesPanel.Position = [534 491 306 135];
+            app.CalculatedValuesPanel.Position = [534 504 306 122];
 
             % Create EffectivesamplerateHzEditFieldLabel
             app.EffectivesamplerateHzEditFieldLabel = uilabel(app.CalculatedValuesPanel);
             app.EffectivesamplerateHzEditFieldLabel.HorizontalAlignment = 'right';
-            app.EffectivesamplerateHzEditFieldLabel.Position = [38 85 142 22];
+            app.EffectivesamplerateHzEditFieldLabel.Position = [38 72 142 22];
             app.EffectivesamplerateHzEditFieldLabel.Text = 'Effective sample rate [Hz]';
 
             % Create EffectivesamplerateHzEditField
             app.EffectivesamplerateHzEditField = uieditfield(app.CalculatedValuesPanel, 'numeric');
-            app.EffectivesamplerateHzEditField.Position = [195 85 100 22];
+            app.EffectivesamplerateHzEditField.Position = [195 72 100 22];
 
             % Create SamplesPulseWidthEditFieldLabel
             app.SamplesPulseWidthEditFieldLabel = uilabel(app.CalculatedValuesPanel);
             app.SamplesPulseWidthEditFieldLabel.HorizontalAlignment = 'right';
-            app.SamplesPulseWidthEditFieldLabel.Position = [50 49 130 22];
+            app.SamplesPulseWidthEditFieldLabel.Position = [50 43 130 22];
             app.SamplesPulseWidthEditFieldLabel.Text = '# Samples Pulse Width';
 
             % Create SamplesPulseWidthEditField
             app.SamplesPulseWidthEditField = uieditfield(app.CalculatedValuesPanel, 'numeric');
-            app.SamplesPulseWidthEditField.Position = [195 49 100 22];
+            app.SamplesPulseWidthEditField.Position = [195 43 100 22];
 
             % Create SamplesPulsePeriodEditFieldLabel
             app.SamplesPulsePeriodEditFieldLabel = uilabel(app.CalculatedValuesPanel);
             app.SamplesPulsePeriodEditFieldLabel.HorizontalAlignment = 'right';
-            app.SamplesPulsePeriodEditFieldLabel.Position = [46 13 134 22];
+            app.SamplesPulsePeriodEditFieldLabel.Position = [46 10 134 22];
             app.SamplesPulsePeriodEditFieldLabel.Text = '# Samples Pulse Period';
 
             % Create SamplesPulsePeriodEditField
             app.SamplesPulsePeriodEditField = uieditfield(app.CalculatedValuesPanel, 'numeric');
-            app.SamplesPulsePeriodEditField.Position = [195 13 100 22];
+            app.SamplesPulsePeriodEditField.Position = [195 10 100 22];
 
             % Create ManualOutputsPanel
             app.ManualOutputsPanel = uipanel(app.SettingsTab);
             app.ManualOutputsPanel.Title = 'Manual Outputs';
-            app.ManualOutputsPanel.Position = [534 323 136 157];
+            app.ManualOutputsPanel.Position = [549 307 136 185];
 
             % Create UseManualValuesButton
             app.UseManualValuesButton = uibutton(app.ManualOutputsPanel, 'state');
             app.UseManualValuesButton.ValueChangedFcn = createCallbackFcn(app, @UseManualValuesButtonValueChanged, true);
             app.UseManualValuesButton.Text = 'Use Manual Values';
-            app.UseManualValuesButton.Position = [6 103 119 22];
+            app.UseManualValuesButton.Position = [6 131 119 22];
 
             % Create DPPulseButton
             app.DPPulseButton = uibutton(app.ManualOutputsPanel, 'state');
             app.DPPulseButton.ValueChangedFcn = createCallbackFcn(app, @DPPulseButtonValueChanged, true);
             app.DPPulseButton.Text = 'DP Pulse';
-            app.DPPulseButton.Position = [6 75 100 22];
+            app.DPPulseButton.Position = [6 103 100 22];
 
             % Create ShutterButton
             app.ShutterButton = uibutton(app.ManualOutputsPanel, 'state');
             app.ShutterButton.ValueChangedFcn = createCallbackFcn(app, @ShutterButtonValueChanged, true);
             app.ShutterButton.Text = 'Shutter';
-            app.ShutterButton.Position = [6 44 100 22];
+            app.ShutterButton.Position = [6 72 100 22];
 
             % Create MWPulseButton
             app.MWPulseButton = uibutton(app.ManualOutputsPanel, 'state');
             app.MWPulseButton.ValueChangedFcn = createCallbackFcn(app, @MWPulseButtonValueChanged, true);
             app.MWPulseButton.Text = 'MW Pulse';
-            app.MWPulseButton.Position = [6 14 100 22];
+            app.MWPulseButton.Position = [6 42 100 22];
+
+            % Create EOMButton
+            app.EOMButton = uibutton(app.ManualOutputsPanel, 'state');
+            app.EOMButton.ValueChangedFcn = createCallbackFcn(app, @EOMButtonValueChanged, true);
+            app.EOMButton.Text = 'EOM';
+            app.EOMButton.Position = [6 10 100 22];
+
+            % Create NumberofPulsesSpinnerLabel
+            app.NumberofPulsesSpinnerLabel = uilabel(app.SettingsTab);
+            app.NumberofPulsesSpinnerLabel.HorizontalAlignment = 'right';
+            app.NumberofPulsesSpinnerLabel.Position = [8 379 101 22];
+            app.NumberofPulsesSpinnerLabel.Text = 'Number of Pulses';
+
+            % Create NumberofPulsesSpinner
+            app.NumberofPulsesSpinner = uispinner(app.SettingsTab);
+            app.NumberofPulsesSpinner.ValueChangedFcn = createCallbackFcn(app, @NumberofPulsesSpinnerValueChanged, true);
+            app.NumberofPulsesSpinner.Position = [124 379 100 22];
 
             % Create RawDataTab
             app.RawDataTab = uitab(app.TabGroup);
