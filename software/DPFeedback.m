@@ -202,7 +202,7 @@ classdef DPFeedback < handle
             self.numpulses.set(50);
             self.period.set(5e-6);
             self.shutterDelay.set(2.5e-3);
-            self.eomDelay.set(300e-9);
+            self.eomDelay.set(500e-9);
             
             self.delay.set(0);
             self.samplesPerPulse.set(250);

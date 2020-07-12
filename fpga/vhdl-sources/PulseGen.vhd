@@ -129,11 +129,11 @@ begin
                         count <= count + 1;
                         pulse_o <= '1';
                         aux_o <= '1';
-                    elsif count < period - 1 then
+                    elsif count < width + delayLO then
                         count <= count + 1;
                         pulse_o <= '0';
                         aux_o <= '1';
-                    elsif count < period - 1 + delayLO then
+                    elsif count < period - 1 then
                         count <= count + 1;
                         pulse_o <= '0';
                         aux_o <= '0';
