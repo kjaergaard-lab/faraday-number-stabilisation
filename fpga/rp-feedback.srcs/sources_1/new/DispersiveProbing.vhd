@@ -20,6 +20,7 @@ entity DispersiveProbing is
         pulseReg0       :   in  t_param_reg;
         pulseReg1       :   in  t_param_reg;
         pulseReg2       :   in  t_param_reg;
+        pulseReg3       :   in  t_param_reg;
         avgReg0         :   in  t_param_reg;
         integrateReg0   :   in  t_param_reg;
         auxReg0         :   in  t_param_reg;
@@ -30,6 +31,7 @@ entity DispersiveProbing is
         quad_o          :   out unsigned(QUAD_WIDTH-1 downto 0);
         valid_o         :   out std_logic;
         pulse_o         :   out std_logic;
+        aux_o           :   out std_logic;
         shutter_o       :   out std_logic;
         status_o        :   out t_module_status
     );
@@ -46,8 +48,10 @@ component PulseGen is
         reg0        :   in  t_param_reg;
         reg1        :   in  t_param_reg;
         reg2        :   in  t_param_reg;
+        reg3        :   in  t_param_reg;
         
         pulse_o     :   out std_logic;
+        aux_o       :   out std_logic;
         status_o    :   out t_module_status
     );
 end component;    
@@ -122,7 +126,7 @@ component SaveADCData is
 end component;
 
 
-signal pulse        :   std_logic   :=  '0';
+signal pulse, pulseAux        :   std_logic   :=  '0';
 signal pulseStatus  :   t_module_status :=  INIT_MODULE_STATUS;
 signal adcAvg   :   t_adc_combined  :=  (others => '0');
 signal validAvg :   std_logic;
@@ -186,10 +190,13 @@ port map(
     reg0    =>  pulseReg0,
     reg1    =>  pulseReg1,
     reg2    =>  pulseReg2,
+    reg3    =>  pulseReg3,
     pulse_o =>  pulse,
+    aux_o   =>  pulseAux,
     status_o=>  pulseStatus
 );
 pulse_o <= pulse;
+aux_o <= pulseAux;
 shutter_o <= pulseStatus.running;
 
 InitAvg: QuickAvg

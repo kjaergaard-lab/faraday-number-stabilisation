@@ -20,6 +20,7 @@ classdef DPFeedback < handle
         numpulses
         period
         shutterDelay
+        eomDelay
         
         delay
         samplesPerPulse
@@ -44,6 +45,7 @@ classdef DPFeedback < handle
         pulseDPMan
         shutterDPMan
         pulseMWMan
+        eomMan
     end
     
     properties(SetAccess = protected)
@@ -52,6 +54,7 @@ classdef DPFeedback < handle
         pulseReg0
         pulseReg1
         pulseReg2
+        pulseReg3
         avgReg0
         integrateReg0
         fbComputeReg0
@@ -85,14 +88,15 @@ classdef DPFeedback < handle
             self.pulseReg0 = DPFeedbackRegister('8',self.conn);
             self.pulseReg1 = DPFeedbackRegister('C',self.conn);
             self.pulseReg2 = DPFeedbackRegister('10',self.conn);
-            self.avgReg0 = DPFeedbackRegister('14',self.conn);
-            self.integrateReg0 = DPFeedbackRegister('18',self.conn);
-            self.fbComputeReg0 = DPFeedbackRegister('1C',self.conn);
-            self.fbComputeReg1 = DPFeedbackRegister('20',self.conn);
-            self.fbComputeReg2 = DPFeedbackRegister('24',self.conn);
-            self.fbComputeReg3 = DPFeedbackRegister('28',self.conn);
-            self.fbPulseReg0 = DPFeedbackRegister('2C',self.conn);
-            self.fbPulseReg1 = DPFeedbackRegister('30',self.conn);
+            self.pulseReg3 = DPFeedbackRegister('14',self.conn);
+            self.avgReg0 = DPFeedbackRegister('18',self.conn);
+            self.integrateReg0 = DPFeedbackRegister('1C',self.conn);
+            self.fbComputeReg0 = DPFeedbackRegister('20',self.conn);
+            self.fbComputeReg1 = DPFeedbackRegister('24',self.conn);
+            self.fbComputeReg2 = DPFeedbackRegister('28',self.conn);
+            self.fbComputeReg3 = DPFeedbackRegister('2C',self.conn);
+            self.fbPulseReg0 = DPFeedbackRegister('30',self.conn);
+            self.fbPulseReg1 = DPFeedbackRegister('34',self.conn);
             
             % Read-only registers
             self.sampleReg0 = DPFeedbackRegister('01000000',self.conn);
@@ -121,6 +125,9 @@ classdef DPFeedback < handle
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
             self.shutterDelay = DPFeedbackParameter([0,31],self.pulseReg2)...
                 .setLimits('lower',0,'upper',10)...
+                .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
+            self.eomDelay = DPFeedbackParameter([0,31],self.pulseReg3)...
+                .setLimits('lower',0,'upper',100e-6)...
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
             
             %Initial processing
@@ -181,6 +188,8 @@ classdef DPFeedback < handle
                 .setLimits('lower',0,'upper',1);
             self.pulseMWMan = DPFeedbackParameter([28,28],self.sharedReg0)...
                 .setLimits('lower',0,'upper',1);
+            self.eomMan = DPFeedbackParameter([27,27],self.sharedReg0)...
+                .setLimits('lower',0,'upper',1);
         end
         
         function self = setDefaults(self,varargin)
@@ -193,6 +202,7 @@ classdef DPFeedback < handle
             self.numpulses.set(50);
             self.period.set(5e-6);
             self.shutterDelay.set(2.5e-3);
+            self.eomDelay.set(300e-9);
             
             self.delay.set(0);
             self.samplesPerPulse.set(250);
@@ -217,9 +227,14 @@ classdef DPFeedback < handle
             self.pulseDPMan.set(0);
             self.shutterDPMan.set(0);
             self.pulseMWMan.set(0);
+            self.eomMan.set(0);
         end
         
         function self = check(self)
+            if self.eomDelay.value >= self.width.value
+                error('EOM Delay should be less than the pulse width');
+            end
+            
             if self.width.get >= self.period.get
                 error('Dispersive pulse width should be less than dispersive pulse period');
             end
@@ -252,6 +267,7 @@ classdef DPFeedback < handle
             self.pulseReg0.write;
             self.pulseReg1.write;
             self.pulseReg2.write;
+            self.pulseReg3.write;
             self.avgReg0.write;
             self.integrateReg0.write;
             
@@ -270,6 +286,7 @@ classdef DPFeedback < handle
             self.pulseReg0.read;
             self.pulseReg1.read;
             self.pulseReg2.read;
+            self.pulseReg3.read;
             self.avgReg0.read;
             self.integrateReg0.read;
             self.sampleReg0.read;
@@ -292,6 +309,7 @@ classdef DPFeedback < handle
             self.numpulses.get;
             self.period.get;
             self.shutterDelay.get;
+            self.eomDelay.get;
             
             self.delay.get;
             self.samplesPerPulse.get;
@@ -318,6 +336,7 @@ classdef DPFeedback < handle
             self.pulseDPMan.get;
             self.shutterDPMan.get;
             self.pulseMWMan.get;
+            self.eomMan.get;
             
         end
         
@@ -387,6 +406,8 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t    sharedReg0: %08x\n',self.sharedReg0.value);
             fprintf(1,'\t\t     pulseReg0: %08x\n',self.pulseReg0.value);
             fprintf(1,'\t\t     pulseReg1: %08x\n',self.pulseReg1.value);
+            fprintf(1,'\t\t     pulseReg2: %08x\n',self.pulseReg2.value);
+            fprintf(1,'\t\t     pulseReg3: %08x\n',self.pulseReg3.value);
             fprintf(1,'\t\t       avgReg0: %08x\n',self.avgReg0.value);
             fprintf(1,'\t\t integrateReg0: %08x\n',self.integrateReg0.value);
             fprintf(1,'\t\t fbComputeReg0: %08x\n',self.fbComputeReg0.value);
@@ -408,6 +429,7 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t       Pulse Width: %.2e s\n',self.width.value);
             fprintf(1,'\t\t      Pulse Period: %.2e s\n',self.period.value);
             fprintf(1,'\t\t     Shutter Delay: %.2e s\n',self.shutterDelay.value);
+            fprintf(1,'\t\t         EOM Delay: %.2e s\n',self.eomDelay.value);
             fprintf(1,'\t\t  Number of pulses: %d\n',self.numpulses.value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Averaging Parameters\n');

@@ -53,6 +53,7 @@ component DispersiveProbing is
         pulseReg0       :   in  t_param_reg;
         pulseReg1       :   in  t_param_reg;
         pulseReg2       :   in  t_param_reg;
+        pulseReg3       :   in  t_param_reg;
         avgReg0         :   in  t_param_reg;
         integrateReg0   :   in  t_param_reg;
         auxReg0         :   in  t_param_reg;
@@ -63,6 +64,7 @@ component DispersiveProbing is
         quad_o          :   out unsigned(QUAD_WIDTH-1 downto 0);
         valid_o         :   out std_logic;
         pulse_o         :   out std_logic;
+        aux_o           :   out std_logic;
         shutter_o       :   out std_logic;
         status_o        :   out t_module_status
     );
@@ -118,10 +120,11 @@ signal sharedReg0   :   t_param_reg :=  (others => '0');
 -- Dispersive signals
 --
 signal trig                 :   std_logic   :=  '0';
-signal pulseReg0, pulseReg1, pulseReg2, avgReg0, integrateReg0, auxReg0 :   t_param_reg :=  (others => '0');
+signal pulseReg0, pulseReg1, pulseReg2, pulseReg3, avgReg0, integrateReg0, auxReg0 :   t_param_reg :=  (others => '0');
 signal quadSignal           :   unsigned(QUAD_WIDTH-1 downto 0);
 signal quadValid            :   std_logic;
 signal pulseDP, shutterDP   :   std_logic   :=  '0';
+signal pulseEOM, pulseEOMMan:   std_logic   :=  '0';
 signal pulseDPMan, shutterDPMan   :   std_logic   :=  '0';
 signal dpControl_i          :   t_control   :=  INIT_CONTROL_ENABLED;
 signal manualFlag           :   std_logic   :=  '0';
@@ -172,6 +175,7 @@ port map(
     pulseReg0       =>  pulseReg0,
     pulseReg1       =>  pulseReg1,
     pulseReg2       =>  pulseReg2,
+    pulseReg3       =>  pulseReg3,
     avgReg0         =>  avgReg0,
     integrateReg0   =>  integrateReg0,
     auxReg0         =>  auxReg0,
@@ -182,6 +186,7 @@ port map(
     quad_o          =>  quadSignal,
     valid_o         =>  quadValid,
     pulse_o         =>  pulseDP,
+    aux_o           =>  pulseEOM,
     shutter_o       =>  shutterDP,
     status_o        =>  dpStatus
 );
@@ -215,6 +220,7 @@ ext_o(0) <= pulseDP or not dpStatus.running when manualFlag = '0' else pulseDPMa
 ext_o(1) <= shutterDP when manualFlag = '0' else shutterDPMan;
 ext_o(2) <= pulseMW when manualFlag = '0' else pulseMWMan;
 ext_o(3) <= pulseDP;
+ext_o(4) <= pulseEOM when manualFlag = '0' else pulseEOMMan;
 
 
 
@@ -243,7 +249,8 @@ fbAuxReg0 <= (0 => sharedReg0(3), others => '0');
 manualFlag <= sharedReg0(31);
 pulseDPMan <= sharedReg0(30);
 shutterDPMan <= sharedReg0(29);
-pulseMWMan <= sharedREg0(28);
+pulseMWMan <= sharedReg0(28);
+pulseEOMMan <= sharedReg0(27);
 
 mem_bus_m(0).reset <= reset or dpControl_i.start;
 mem_bus_m(1).reset <= reset or dpControl_i.start;
@@ -288,14 +295,16 @@ begin
                             when X"000008" => rw(bus_m,bus_s,comState,pulseReg0);
                             when X"00000C" => rw(bus_m,bus_s,comState,pulseReg1);
                             when X"000010" => rw(bus_m,bus_s,comState,pulseReg2);
-                            when X"000014" => rw(bus_m,bus_s,comState,avgReg0);
-                            when X"000018" => rw(bus_m,bus_s,comState,integrateReg0);
-                            when X"00001C" => rw(bus_m,bus_s,comState,fbComputeReg0);
-                            when X"000020" => rw(bus_m,bus_s,comState,fbComputeReg1);
-                            when X"000024" => rw(bus_m,bus_s,comState,fbComputeReg2);
-                            when X"000028" => rw(bus_m,bus_s,comState,fbComputeReg3);
-                            when X"00002C" => rw(bus_m,bus_s,comState,fbPulseReg0);
-                            when X"000030" => rw(bus_m,bus_s,comState,fbPulseReg1);
+                            when X"000014" => rw(bus_m,bus_s,comState,pulseReg3);
+                            when X"000018" => rw(bus_m,bus_s,comState,avgReg0);
+                            when X"00001C" => rw(bus_m,bus_s,comState,integrateReg0);
+                            when X"000020" => rw(bus_m,bus_s,comState,fbComputeReg0);
+                            when X"000024" => rw(bus_m,bus_s,comState,fbComputeReg1);
+                            when X"000028" => rw(bus_m,bus_s,comState,fbComputeReg2);
+                            when X"00002C" => rw(bus_m,bus_s,comState,fbComputeReg3);
+                            when X"000030" => rw(bus_m,bus_s,comState,fbPulseReg0);
+                            when X"000034" => rw(bus_m,bus_s,comState,fbPulseReg1);
+                            
                             
                             when others => 
                                 comState <= finishing;
