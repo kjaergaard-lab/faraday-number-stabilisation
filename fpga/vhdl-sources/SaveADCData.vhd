@@ -66,16 +66,18 @@ PORT MAP (
 -- On the falling edge of 'trig' we reset the counter
 --
 wea(0) <= valid_i;
-bus_s.last <= addra;
+-- bus_s.last <= addra;
 WriteProc: process(adcClk,aresetn) is
 begin
     if aresetn = '0' then
         addra <= (others => '0');
+        bus_s.last <= (others => '0');
     elsif rising_edge(adcClk) then
         if bus_m.reset = '1' then
             addra <= (others => '0');
         elsif valid_i = '1' and addra < (addra'range => '1') then
             addra <= addra + 1;
+            bus_s.last <= addra + 1;
         end if;
     end if;
 end process;

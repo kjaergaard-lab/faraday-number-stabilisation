@@ -166,14 +166,15 @@ begin
         autoReset <= '0';
         autoResetCount <= (others => '0');
     elsif rising_edge(sysClk) then
-        if trigSync = "01" then
-            if autoResetCount >= AUTO_RESET_TIMER then
-                autoReset <= '1';
-            end if;
+        if powerCntrl.start = '1' then
             autoResetCount <= (others => '0');
+            autoReset <= '0';
         elsif autoResetCount < AUTO_RESET_TIMER then
             autoResetCount <= autoResetCount + 1;
             autoReset <= '0';
+        elsif autoResetCount = AUTO_RESET_TIMER then
+            autoResetCount <= autoResetCount + 1;
+            autoReset <= '1';
         else
             autoReset <= '0';
         end if;
