@@ -6,6 +6,8 @@ classdef DPFeedback < handle
         data
         signal
         tPulse
+        
+        fixEOMValues
     end
     
     properties(SetAccess = immutable)
@@ -20,6 +22,8 @@ classdef DPFeedback < handle
         numpulses
         period
         shutterDelay
+        
+        eomWidth
         eomDelay
         
         delay
@@ -55,6 +59,7 @@ classdef DPFeedback < handle
         pulseReg1
         pulseReg2
         pulseReg3
+        pulseReg4
         avgReg0
         integrateReg0
         fbComputeReg0
@@ -89,14 +94,15 @@ classdef DPFeedback < handle
             self.pulseReg1 = DPFeedbackRegister('C',self.conn);
             self.pulseReg2 = DPFeedbackRegister('10',self.conn);
             self.pulseReg3 = DPFeedbackRegister('14',self.conn);
-            self.avgReg0 = DPFeedbackRegister('18',self.conn);
-            self.integrateReg0 = DPFeedbackRegister('1C',self.conn);
-            self.fbComputeReg0 = DPFeedbackRegister('20',self.conn);
-            self.fbComputeReg1 = DPFeedbackRegister('24',self.conn);
-            self.fbComputeReg2 = DPFeedbackRegister('28',self.conn);
-            self.fbComputeReg3 = DPFeedbackRegister('2C',self.conn);
-            self.fbPulseReg0 = DPFeedbackRegister('30',self.conn);
-            self.fbPulseReg1 = DPFeedbackRegister('34',self.conn);
+            self.pulseReg4 = DPFeedbackRegister('18',self.conn);
+            self.avgReg0 = DPFeedbackRegister('1C',self.conn);
+            self.integrateReg0 = DPFeedbackRegister('20',self.conn);
+            self.fbComputeReg0 = DPFeedbackRegister('24',self.conn);
+            self.fbComputeReg1 = DPFeedbackRegister('28',self.conn);
+            self.fbComputeReg2 = DPFeedbackRegister('2C',self.conn);
+            self.fbComputeReg3 = DPFeedbackRegister('30',self.conn);
+            self.fbPulseReg0 = DPFeedbackRegister('34',self.conn);
+            self.fbPulseReg1 = DPFeedbackRegister('38',self.conn);
             
             % Read-only registers
             self.sampleReg0 = DPFeedbackRegister('01000000',self.conn);
@@ -126,9 +132,15 @@ classdef DPFeedback < handle
             self.shutterDelay = DPFeedbackParameter([0,31],self.pulseReg2)...
                 .setLimits('lower',0,'upper',10)...
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
+            
+            
             self.eomDelay = DPFeedbackParameter([0,31],self.pulseReg3)...
-                .setLimits('lower',0,'upper',100e-6)...
+                .setLimits('lower',-10,'upper',10)...
+                .setFunctions('to',@(x) (x+self.shutterDelay.get())*self.CLK,'from',@(x) x/self.CLK-self.shutterDelay.get());
+            self.eomWidth = DPFeedbackParameter([0,15],self.pulseReg4)...
+                .setLimits('lower',100e-9,'upper',10e-3)...
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
+                
             
             %Initial processing
             self.delay = DPFeedbackParameter([0,13],self.avgReg0)...
@@ -193,6 +205,8 @@ classdef DPFeedback < handle
         end
         
         function self = setDefaults(self,varargin)
+            self.fixEOMValues = true;
+            
             self.enableDP.set(1);
             self.enableFB.set(0);
             self.enableManualMW.set(0);
@@ -202,6 +216,8 @@ classdef DPFeedback < handle
             self.numpulses.set(50);
             self.period.set(5e-6);
             self.shutterDelay.set(2.5e-3);
+            
+            self.eomWidth.set(self.width.value);
             self.eomDelay.set(500e-9);
             
             self.delay.set(0);
@@ -231,9 +247,9 @@ classdef DPFeedback < handle
         end
         
         function self = check(self)
-            if self.eomDelay.value >= self.width.value
-                error('EOM Delay should be less than the pulse width');
-            end
+%             if self.eomDelay.value >= self.width.value
+%                 error('EOM Delay should be less than the pulse width');
+%             end
             
             if self.width.get >= self.period.get
                 error('Dispersive pulse width should be less than dispersive pulse period');
@@ -262,12 +278,16 @@ classdef DPFeedback < handle
         end
         
         function self = upload(self)
+            if self.fixEOMValues
+                self.eomWidth.set(self.width.value);
+            end
             self.check;
             self.sharedReg0.write;
             self.pulseReg0.write;
             self.pulseReg1.write;
             self.pulseReg2.write;
             self.pulseReg3.write;
+            self.pulseReg4.write;
             self.avgReg0.write;
             self.integrateReg0.write;
             
@@ -287,6 +307,7 @@ classdef DPFeedback < handle
             self.pulseReg1.read;
             self.pulseReg2.read;
             self.pulseReg3.read;
+            self.pulseReg4.read;
             self.avgReg0.read;
             self.integrateReg0.read;
             self.sampleReg0.read;
@@ -309,6 +330,8 @@ classdef DPFeedback < handle
             self.numpulses.get;
             self.period.get;
             self.shutterDelay.get;
+            
+            self.eomWidth.get;
             self.eomDelay.get;
             
             self.delay.get;
@@ -408,6 +431,7 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t     pulseReg1: %08x\n',self.pulseReg1.value);
             fprintf(1,'\t\t     pulseReg2: %08x\n',self.pulseReg2.value);
             fprintf(1,'\t\t     pulseReg3: %08x\n',self.pulseReg3.value);
+            fprintf(1,'\t\t     pulseReg4: %08x\n',self.pulseReg4.value);
             fprintf(1,'\t\t       avgReg0: %08x\n',self.avgReg0.value);
             fprintf(1,'\t\t integrateReg0: %08x\n',self.integrateReg0.value);
             fprintf(1,'\t\t fbComputeReg0: %08x\n',self.fbComputeReg0.value);
@@ -430,6 +454,7 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t      Pulse Period: %.2e s\n',self.period.value);
             fprintf(1,'\t\t     Shutter Delay: %.2e s\n',self.shutterDelay.value);
             fprintf(1,'\t\t         EOM Delay: %.2e s\n',self.eomDelay.value);
+            fprintf(1,'\t\t         EOM Width: %.2e s\n',self.eomWidth.value);
             fprintf(1,'\t\t  Number of pulses: %d\n',self.numpulses.value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Averaging Parameters\n');

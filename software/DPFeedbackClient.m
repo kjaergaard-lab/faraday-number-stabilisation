@@ -72,9 +72,16 @@ classdef DPFeedbackClient < handle
 
                 msg_write = [typecast(len,'uint8'),uint8(msg),typecast(uint32(data),'uint8')];
                 write(self.client,msg_write);
+                
+                jj = 1;
                 while ~self.recvDone
                     self.read;
                     pause(10e-3);
+                    if jj>1e3
+                        error('Timeout reading data');
+                    else
+                        jj = jj+1;
+                    end
                 end
                 self.close
             catch
