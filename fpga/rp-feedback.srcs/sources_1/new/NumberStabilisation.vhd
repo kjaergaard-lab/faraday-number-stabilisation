@@ -55,10 +55,8 @@ component PulseGen is
         reg0        :   in  t_param_reg;
         reg1        :   in  t_param_reg;
         reg2        :   in  t_param_reg;
-        reg3        :   in  t_param_reg;
         
         pulse_o     :   out std_logic;
-        aux_o       :   out std_logic;
         status_o    :   out t_module_status
     );
 end component;   
@@ -147,9 +145,7 @@ port map(
     reg0    =>  pulseReg0_sig,
     reg1    =>  pulseReg1,
     reg2    =>  (others => '0'),
-    reg3    =>  (others => '0'),
     pulse_o =>  pulse_o,
-    aux_o   =>  open,
     status_o=>  pulseStatus
 );
 

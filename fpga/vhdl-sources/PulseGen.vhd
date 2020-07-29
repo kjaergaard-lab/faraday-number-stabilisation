@@ -13,10 +13,8 @@ entity PulseGen is
         reg0        :   in  t_param_reg;
         reg1        :   in  t_param_reg;
         reg2        :   in  t_param_reg;
-        reg3        :   in  t_param_reg;
         
         pulse_o     :   out std_logic;
-        aux_o       :   out std_logic;
         status_o    :   out t_module_status
     );
 end PulseGen;
@@ -33,9 +31,8 @@ signal count        :   unsigned(31 downto 0)   :=  (others => '0');
 signal numPulses, width :   unsigned(count'length-1 downto 0);
 signal period   :   unsigned(31 downto 0);
 signal delay    :   unsigned(31 downto 0);
-signal delayLO  :   unsigned(31 downto 0);
 
-signal pulseCount   :   unsigned(numPulses'length-1 downto 0)   :=  to_unsigned(10,numPulses'length);
+signal pulseCount   :   unsigned(numPulses'length-1 downto 0)   :=  (others => '0');
 
 begin
 
@@ -43,7 +40,6 @@ numPulses <= resize(unsigned(reg0(31 downto 16)),numPulses'length);
 width <= resize(unsigned(reg0(15 downto 0)),width'length);
 period <= unsigned(reg1);
 delay <= unsigned(reg2);
-delayLO <= unsigned(reg3);
 
 TrigSync: process(clk,aresetn) is
 begin
@@ -60,7 +56,6 @@ PulseProc: process(clk,aresetn) is
 begin
     if aresetn = '0' then
         pulse_o <= '0';
-        aux_o <= '0';
         pulseCount <= (others => '0');
         count <= (others => '0');
         status_o <= INIT_MODULE_STATUS;
@@ -74,7 +69,6 @@ begin
             pulseCount <= (others => '0');
             state <= idle;
             pulse_o <= '0';
-            aux_o <= '0';
             status_o <= (running => '0', done => '1', started => '0');
         else
             FSM: case state is
@@ -87,11 +81,6 @@ begin
                         status_o.started <= '1';
                         if delay = 0 then
                             pulse_o <= '1';
-                            if delayLO = 0 then
-                                aux_o <= '1';
-                            else
-                                aux_o <= '0';
-                            end if;
                             state <= pulsing;
                         else
                             pulse_o <= '0';
@@ -100,7 +89,6 @@ begin
                     else
                         count <= to_unsigned(0,count'length);
                         pulse_o <= '0';
-                        aux_o <= '0';
                         status_o.running <= '0';
                     end if;
                     
@@ -111,32 +99,17 @@ begin
                     else
                         count <= to_unsigned(1,count'length);
                         pulse_o <= '1';
-                        if delayLO = 0 then
-                            aux_o <= '1';
-                        else
-                            aux_o <= '0';
-                        end if;
                         state <= pulsing;
                     end if;
                     
                 when pulsing =>
                     status_o.started <= '0';
-                    if count < delayLO then
+                    if count < width then
                         count <= count + 1;
                         pulse_o <= '1';
-                        aux_o <= '0';
-                    elsif count < width then
-                        count <= count + 1;
-                        pulse_o <= '1';
-                        aux_o <= '1';
-                    elsif count < width + delayLO then
-                        count <= count + 1;
-                        pulse_o <= '0';
-                        aux_o <= '1';
                     elsif count < period - 1 then
                         count <= count + 1;
                         pulse_o <= '0';
-                        aux_o <= '0';
                     else
                         count <= to_unsigned(1,count'length);
                         state <= incrementing;

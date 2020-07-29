@@ -54,6 +54,7 @@ component DispersiveProbing is
         pulseReg1       :   in  t_param_reg;
         pulseReg2       :   in  t_param_reg;
         pulseReg3       :   in  t_param_reg;
+        pulseReg4       :   in  t_param_reg;
         avgReg0         :   in  t_param_reg;
         integrateReg0   :   in  t_param_reg;
         auxReg0         :   in  t_param_reg;
@@ -120,7 +121,7 @@ signal sharedReg0   :   t_param_reg :=  (others => '0');
 -- Dispersive signals
 --
 signal trig                 :   std_logic   :=  '0';
-signal pulseReg0, pulseReg1, pulseReg2, pulseReg3, avgReg0, integrateReg0, auxReg0 :   t_param_reg :=  (others => '0');
+signal pulseReg0, pulseReg1, pulseReg2, pulseReg3, pulseReg4, avgReg0, integrateReg0, auxReg0 :   t_param_reg :=  (others => '0');
 signal quadSignal           :   unsigned(QUAD_WIDTH-1 downto 0);
 signal quadValid            :   std_logic;
 signal pulseDP, shutterDP   :   std_logic   :=  '0';
@@ -176,6 +177,7 @@ port map(
     pulseReg1       =>  pulseReg1,
     pulseReg2       =>  pulseReg2,
     pulseReg3       =>  pulseReg3,
+    pulseReg4       =>  pulseReg4,
     avgReg0         =>  avgReg0,
     integrateReg0   =>  integrateReg0,
     auxReg0         =>  auxReg0,
@@ -296,14 +298,15 @@ begin
                             when X"00000C" => rw(bus_m,bus_s,comState,pulseReg1);
                             when X"000010" => rw(bus_m,bus_s,comState,pulseReg2);
                             when X"000014" => rw(bus_m,bus_s,comState,pulseReg3);
-                            when X"000018" => rw(bus_m,bus_s,comState,avgReg0);
-                            when X"00001C" => rw(bus_m,bus_s,comState,integrateReg0);
-                            when X"000020" => rw(bus_m,bus_s,comState,fbComputeReg0);
-                            when X"000024" => rw(bus_m,bus_s,comState,fbComputeReg1);
-                            when X"000028" => rw(bus_m,bus_s,comState,fbComputeReg2);
-                            when X"00002C" => rw(bus_m,bus_s,comState,fbComputeReg3);
-                            when X"000030" => rw(bus_m,bus_s,comState,fbPulseReg0);
-                            when X"000034" => rw(bus_m,bus_s,comState,fbPulseReg1);
+                            when X"000018" => rw(bus_m,bus_s,comState,pulseReg4);
+                            when X"00001C" => rw(bus_m,bus_s,comState,avgReg0);
+                            when X"000020" => rw(bus_m,bus_s,comState,integrateReg0);
+                            when X"000024" => rw(bus_m,bus_s,comState,fbComputeReg0);
+                            when X"000028" => rw(bus_m,bus_s,comState,fbComputeReg1);
+                            when X"00002C" => rw(bus_m,bus_s,comState,fbComputeReg2);
+                            when X"000030" => rw(bus_m,bus_s,comState,fbComputeReg3);
+                            when X"000034" => rw(bus_m,bus_s,comState,fbPulseReg0);
+                            when X"000038" => rw(bus_m,bus_s,comState,fbPulseReg1);
                             
                             
                             when others => 

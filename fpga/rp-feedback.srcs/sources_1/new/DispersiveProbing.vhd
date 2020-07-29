@@ -21,6 +21,7 @@ entity DispersiveProbing is
         pulseReg1       :   in  t_param_reg;
         pulseReg2       :   in  t_param_reg;
         pulseReg3       :   in  t_param_reg;
+        pulseReg4       :   in  t_param_reg;
         avgReg0         :   in  t_param_reg;
         integrateReg0   :   in  t_param_reg;
         auxReg0         :   in  t_param_reg;
@@ -48,10 +49,8 @@ component PulseGen is
         reg0        :   in  t_param_reg;
         reg1        :   in  t_param_reg;
         reg2        :   in  t_param_reg;
-        reg3        :   in  t_param_reg;
         
         pulse_o     :   out std_logic;
-        aux_o       :   out std_logic;
         status_o    :   out t_module_status
     );
 end component;    
@@ -126,7 +125,7 @@ component SaveADCData is
 end component;
 
 
-signal pulse, pulseAux        :   std_logic   :=  '0';
+signal pulse, pulseEOM       :   std_logic   :=  '0';
 signal pulseStatus  :   t_module_status :=  INIT_MODULE_STATUS;
 signal adcAvg   :   t_adc_combined  :=  (others => '0');
 signal validAvg :   std_logic;
@@ -146,6 +145,8 @@ constant SHUTTER_HOLDOFF    :   unsigned(23 downto 0)   :=  to_unsigned(625000,2
 
 type t_status_local is (idle, counting);
 signal state    :   t_status_local  :=  idle;
+
+signal pulseRegEOM  :   t_param_reg;
 
 begin
 
@@ -182,7 +183,7 @@ begin
     end if;
 end process;
 
-Pulses: PulseGen
+LaserPulses: PulseGen
 port map(
     clk     =>  sysClk,
     aresetn =>  aresetn,
@@ -190,13 +191,24 @@ port map(
     reg0    =>  pulseReg0,
     reg1    =>  pulseReg1,
     reg2    =>  pulseReg2,
-    reg3    =>  pulseReg3,
     pulse_o =>  pulse,
-    aux_o   =>  pulseAux,
     status_o=>  pulseStatus
 );
+
+pulseRegEOM <= pulseReg0(31 downto 16) & pulseReg4(15 downto 0);
+EOMPulses: PulseGen
+port map(
+    clk     =>  sysClk,
+    aresetn =>  aresetn,
+    cntrl_i =>  cntrl_i,
+    reg0    =>  pulseRegEOM,
+    reg1    =>  pulseReg1,
+    reg2    =>  pulseReg3,
+    pulse_o =>  pulseEOM,
+    status_o=>  open
+);
 pulse_o <= pulse;
-aux_o <= pulseAux;
+aux_o <= pulseEOM;
 shutter_o <= pulseStatus.running;
 
 InitAvg: QuickAvg
