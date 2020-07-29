@@ -31,7 +31,7 @@ for nn=1:numel(detuning)
         dT(mm,nn) = (Psc(mm,nn)*const.hbar*dp.k/(const.mRb*const.c))./(3*N(mm)*const.kb);
         ph(mm,nn) = dp.prepOverlap(r(1),n(1),0).*dp.k/2;
     end
-    str{nn} = sprintf('%.2f GHz',detuning(nn)/1e9);
+    str{nn} = sprintf('%.2f GHz, %.1e uW',detuning(nn)/1e9,Pc(nn)*1e6);
 end
 
 
@@ -63,29 +63,29 @@ end
 % legend(str,'location','northwest');
 
 %%
-% figure(130);clf;
-% % plot(N/1e6,dT,'.-');
-% % plot_format('N [x10^6]','Heating Rate [uK/us]','',10);
-% plot(detuning/1e9,mean(dT(2:end,:),1),'.-');
-% plot_format('\Delta [GHz]','Heating Rate [uK/us]','',10);
-% 
-% grid on
-% set(gca,'xminorgrid','on','yminorgrid','on')
-% set(gca,'xscale','lin','yscale','log');
-% % legend(str,'location','northwest');
+figure(130);clf;
+% plot(N/1e6,dT,'.-');
+% plot_format('N [x10^6]','Heating Rate [uK/us]','',10);
+plot(detuning/1e9,mean(dT(2:end,:),1),'.-');
+plot_format('\Delta [GHz]','Heating Rate [uK/us]','',10);
+
+grid on
+set(gca,'xminorgrid','on','yminorgrid','on')
+set(gca,'xscale','lin','yscale','log');
+% legend(str,'location','northwest');
 
 %%
 figure(100);clf;
 h = gcf;
-set(h,'units','centimeters','position',[h.Position(1:2),23.2,11.2]);
-ax = axes('position',[0.05,0.12,0.43,.85]);
+% set(h,'units','centimeters','position',[h.Position(1:2),23.2,11.2]);
+ax = axes('position',[0.05,0.125,0.43,.85]);
 plot(N/1e6,S*1e6,'.-');
 plot_format('N [x10^6]','Signal power [uW]','',10);
 grid on
 set(gca,'xminorgrid','on','yminorgrid','on')
 legend(str,'location','northwest');
 
-ax2 = axes('position',[0.05+0.07+0.43,0.12,0.43,.85]);
+ax2 = axes('position',[0.05+0.07+0.43,0.125,0.43,.85]);
 for nn=1:numel(detuning)
     plot(abs(real(ph(:,nn)/pi)),S(:,nn)*1e6,'.-');
     hold on;
