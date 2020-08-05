@@ -14,9 +14,6 @@ entity DispersiveProbing is
         cntrl_i         :   in  t_control;
         adcData_i       :   in  t_adc_combined;
         
-        pow_i           :   in  unsigned(23 downto 0);
-        powValid_i      :   in  std_logic;
-        
         pulseReg0       :   in  t_param_reg;
         pulseReg1       :   in  t_param_reg;
         pulseReg2       :   in  t_param_reg;
@@ -100,10 +97,7 @@ component ComputeSignal is
         dataI_i     :   in  signed(23 downto 0);
         dataQ_i     :   in  signed(23 downto 0);
         valid_i     :   in  std_logic;
-        
-        pow_i       :   in  unsigned(23 downto 0);
-        powValid_i  :   in  std_logic;
-        usePow_i    :   in  std_logic;
+        normalise_i :   in  std_logic;
         
         quad_o      :   out unsigned(QUAD_WIDTH-1 downto 0);
         valid_o     :   out std_logic
@@ -249,9 +243,7 @@ port map(
     dataI_i     =>  dataI,
     dataQ_i     =>  dataQ,
     valid_i     =>  validIntegrate,
-    pow_i       =>  pow_i,
-    powValid_i  =>  powValid_i,
-    usePow_i    =>  usePow,
+    normalise_i =>  usePow,
     quad_o      =>  quadSignal,
     valid_o     =>  validQuad
 );

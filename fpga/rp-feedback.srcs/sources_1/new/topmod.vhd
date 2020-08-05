@@ -47,9 +47,6 @@ component DispersiveProbing is
         cntrl_i         :   in  t_control;
         adcData_i       :   in  t_adc_combined;
         
-        pow_i           :   in  unsigned(23 downto 0);
-        powValid_i      :   in  std_logic;
-        
         pulseReg0       :   in  t_param_reg;
         pulseReg1       :   in  t_param_reg;
         pulseReg2       :   in  t_param_reg;
@@ -149,17 +146,17 @@ signal reset        :   std_logic   :=  '0';
 
 begin
 
-PowerReceiver: UART_Receiver
-generic map(
-    BAUD_PERIOD =>  BAUD_PERIOD,
-    NUM_BITS    =>  UART_NUM_BITS)
-port map(
-    clk         =>  adcClk,
-    aresetn     =>  aresetn,
-    data_o      =>  uartData,
-    valid_o     =>  uartValid,
-    RxD         =>  ext_i(1)
-);
+--PowerReceiver: UART_Receiver
+--generic map(
+--    BAUD_PERIOD =>  BAUD_PERIOD,
+--    NUM_BITS    =>  UART_NUM_BITS)
+--port map(
+--    clk         =>  adcClk,
+--    aresetn     =>  aresetn,
+--    data_o      =>  uartData,
+--    valid_o     =>  uartValid,
+--    RxD         =>  ext_i(1)
+--);
 
 DispersiveProbe: DispersiveProbing
 port map(
@@ -169,9 +166,6 @@ port map(
 
     cntrl_i         =>  dpControl_i,
     adcData_i       =>  adcData_i,
-    
-    pow_i           =>  unsigned(uartData),
-    powValid_i      =>  uartValid,
 
     pulseReg0       =>  pulseReg0,
     pulseReg1       =>  pulseReg1,

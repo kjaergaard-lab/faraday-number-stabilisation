@@ -115,29 +115,29 @@ classdef DPPower < handle
         end
         
         function self = upload(self)
-            self.check;
-            self.avgReg0.write;
-            self.integrateReg0.write;
+%             self.check;
+%             self.avgReg0.write;
+%             self.integrateReg0.write;
         end
         
         function self = fetch(self)
             %Read registers
-            self.avgReg0.read;
-            self.integrateReg0.read;
-            self.sampleReg0.read;
-            
-            %Read parameters 
-            self.delay.get;
-            self.samplesPerPulse.get;
-            self.log2Avgs.get;
-            
-            self.sumStart.get;
-            self.subStart.get;
-            self.sumWidth.get;
-            
-            %Get number of collected samples
-            self.samplesCollected.read;
-            self.numpulses.read;
+%             self.avgReg0.read;
+%             self.integrateReg0.read;
+%             self.sampleReg0.read;
+%             
+%             %Read parameters 
+%             self.delay.get;
+%             self.samplesPerPulse.get;
+%             self.log2Avgs.get;
+%             
+%             self.sumStart.get;
+%             self.subStart.get;
+%             self.sumWidth.get;
+%             
+%             %Get number of collected samples
+%             self.samplesCollected.read;
+%             self.numpulses.read;
             
         end
         
@@ -160,50 +160,50 @@ classdef DPPower < handle
         end
         
         function self = getRaw(self)
-            self.samplesCollected.read;
-            N = self.numpulses.read.get;
-            self.conn.write(0,'mode','fetch raw','numFetch',self.samplesCollected.get);
-            raw = typecast(self.conn.recvMessage,'uint8');
-            [dataI,dataQ] = deal(zeros(self.samplesCollected.value,1));
-
-            mm = 1;
-            for nn=1:4:numel(raw)
-                dataI(mm) = double(typecast(uint8(raw(nn+(0:1))),'int16'));
-                dataQ(mm) = double(typecast(uint8(raw(nn+(2:3))),'int16'));
-                mm = mm+1;
-            end
-            
-            if self.samplesPerPulse.get*N > numel(dataI)
-                maxpulses = floor(numel(dataI)/self.samplesPerPulse.get);
-            else
-                maxpulses = N;
-            end
-            idx = 1:(maxpulses*self.samplesPerPulse.get);
-            self.rawI = reshape(dataI(idx),self.samplesPerPulse.get,maxpulses);
-            self.rawQ = reshape(dataQ(idx),self.samplesPerPulse.get,maxpulses);
-            
-            self.tSample = 2^self.log2Avgs.get/self.CLK*(0:(self.samplesPerPulse.get-1))';
+%             self.samplesCollected.read;
+%             N = self.numpulses.read.get;
+%             self.conn.write(0,'mode','fetch raw','numFetch',self.samplesCollected.get);
+%             raw = typecast(self.conn.recvMessage,'uint8');
+%             [dataI,dataQ] = deal(zeros(self.samplesCollected.value,1));
+% 
+%             mm = 1;
+%             for nn=1:4:numel(raw)
+%                 dataI(mm) = double(typecast(uint8(raw(nn+(0:1))),'int16'));
+%                 dataQ(mm) = double(typecast(uint8(raw(nn+(2:3))),'int16'));
+%                 mm = mm+1;
+%             end
+%             
+%             if self.samplesPerPulse.get*N > numel(dataI)
+%                 maxpulses = floor(numel(dataI)/self.samplesPerPulse.get);
+%             else
+%                 maxpulses = N;
+%             end
+%             idx = 1:(maxpulses*self.samplesPerPulse.get);
+%             self.rawI = reshape(dataI(idx),self.samplesPerPulse.get,maxpulses);
+%             self.rawQ = reshape(dataQ(idx),self.samplesPerPulse.get,maxpulses);
+%             
+%             self.tSample = 2^self.log2Avgs.get/self.CLK*(0:(self.samplesPerPulse.get-1))';
         end
         
         function self = getProcessed(self,period)
-            N = self.numpulses.read.get;
-            self.conn.write(0,'mode','fetch processed','numFetch',2*N);
-            raw = typecast(self.conn.recvMessage,'uint8');
-            
-            self.data = zeros(N,2);
-            mm = 1;
-            for nn=1:8:numel(raw)
-                self.data(mm,1) = double(typecast(uint8(raw(nn+(0:3))),'int32'));
-                self.data(mm,2) = double(typecast(uint8(raw(nn+(4:7))),'int32'));
-                mm = mm+1;
-            end
-            self.data = self.data/self.sumWidth.value;
-            self.signal = self.data(:,1);
-            
-            if nargin==1
-                period = 1;
-            end
-            self.tPulse = period*(0:(N-1))';
+%             N = self.numpulses.read.get;
+%             self.conn.write(0,'mode','fetch processed','numFetch',2*N);
+%             raw = typecast(self.conn.recvMessage,'uint8');
+%             
+%             self.data = zeros(N,2);
+%             mm = 1;
+%             for nn=1:8:numel(raw)
+%                 self.data(mm,1) = double(typecast(uint8(raw(nn+(0:3))),'int32'));
+%                 self.data(mm,2) = double(typecast(uint8(raw(nn+(4:7))),'int32'));
+%                 mm = mm+1;
+%             end
+%             self.data = self.data/self.sumWidth.value;
+%             self.signal = self.data(:,1);
+%             
+%             if nargin==1
+%                 period = 1;
+%             end
+%             self.tPulse = period*(0:(N-1))';
         end
         
         function v = integrate(self)

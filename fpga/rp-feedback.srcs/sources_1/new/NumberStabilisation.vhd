@@ -71,7 +71,7 @@ signal state    :   t_status_local  :=  idle;
 signal numPulses0, numPulses1, numPulses, quadTarget   :   unsigned(QUAD_WIDTH+PULSE_NUM_WIDTH-1 downto 0)  :=  (others => '0');
 signal quadTol      :   unsigned(quad_i'length-1 downto 0)  :=  (others => '0');
 
-signal pulseTrig, pulseTrig_i    :   std_logic   :=  '0';
+signal pulseTrig, pulseTrig_i   :   std_logic   :=  '0';
 signal pulseStatus  :   t_module_status :=  INIT_MODULE_STATUS;
 
 signal divideValid  :   std_logic;
@@ -109,6 +109,7 @@ PORT MAP (
 
 pulseReg0_sig(15 downto 0) <= pulseReg0(15 downto 0);
 pulseReg0_sig(31 downto 16) <= std_logic_vector(numPulses(15 downto 0)) when cntrl_i.enable = '1' else pulseReg0(31 downto 16);
+--pulseReg0_sig <= pulseReg0;
 enableSoftTrig <= auxReg0(0);
 
 TriggerSync: process(adcClk,aresetn) is
@@ -155,6 +156,7 @@ begin
         state <= idle;
         pulseTrig <= '0';
         numPulses <= (others => '0');
+--        pulseCntrl.stop <= '0';
         cntrl_o <= INIT_CONTROL_ENABLED;
     elsif rising_edge(adcClk) then
         ComputeFSM: case(state) is
