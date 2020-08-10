@@ -411,7 +411,11 @@ classdef DPFeedback < handle
                 mm = mm+1;
             end
             self.data = self.data/self.sumWidth.value;
-            self.signal = sqrt(self.data(:,1).^2+self.data(:,2).^2);
+            if self.normalise.value
+                self.signal = self.data(:,1)./self.data(:,2);
+            else
+                self.signal = self.data(:,1);
+            end
             
             self.tPulse = self.period.value*(0:(self.pulsesCollected.value-1))';
         end
