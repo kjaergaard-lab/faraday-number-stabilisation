@@ -41,10 +41,24 @@ signal addra        :   t_mem_addr :=  (others => '0');
 signal state        :   natural range 0 to 3    :=  0;
 signal dina         :   std_logic_vector(31 downto 0)   :=  (others => '0');
 
+signal resetSync    :   std_logic_vector(1 downto 0)    :=  "00";
+
 begin
 
 dina(data_i'length-1 downto 0) <= data_i;
 dina(dina'length-1 downto data_i'length) <= (others => '0');
+
+--
+-- Generate adcClk-synchronous address reset signal
+--
+ResetSyncProc: process(adcClk,aresetn) is
+begin
+    if aresetn = '0' then
+        resetSync <= "00";
+    elsif rising_edge(adcClk) then
+        resetSync <= resetSync(0) & bus_m.reset;
+    end if;
+end process;
 
 --
 -- Instantiate the block memory
@@ -73,7 +87,7 @@ begin
         addra <= (others => '0');
         bus_s.last <= (others => '0');
     elsif rising_edge(adcClk) then
-        if bus_m.reset = '1' then
+        if resetSync = "01" then
             addra <= (others => '0');
         elsif valid_i = '1' and addra < (addra'range => '1') then
             addra <= addra + 1;

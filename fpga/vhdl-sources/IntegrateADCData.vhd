@@ -44,7 +44,7 @@ PORT (
 );
 END COMPONENT;
 
-type t_status_local is (idle, summing, dividing, finishing, output, saving);
+type t_status_local is (idle, summing, dividing, finishing, output, saving, waiting);
 
 signal sumStart, sumEnd, subStart, subEnd, width, count   :   unsigned(10 downto 0)    :=  (others => '0');
 signal adc1, adc1_i, adc2, adc2_i   :   signed(EXT_WIDTH-1 downto 0)    :=  (others => '0');
@@ -131,6 +131,11 @@ begin
                 
                 dataSave_o <= std_logic_vector(resize(adc1,dataSave_o'length));
                 validSave_o <= '1';
+                state <= waiting;
+                
+            when waiting =>
+                valid_o <= '0';
+                validSave_o <= '0';
                 state <= saving;
                 
             when saving =>

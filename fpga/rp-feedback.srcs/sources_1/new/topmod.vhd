@@ -127,6 +127,7 @@ signal pulseDPMan, shutterDPMan   :   std_logic   :=  '0';
 signal dpControl_i          :   t_control   :=  INIT_CONTROL_ENABLED;
 signal manualFlag           :   std_logic   :=  '0';
 signal dpStatus             :   t_module_status :=  INIT_MODULE_STATUS;
+signal dpOnWhenShutterClosed:   std_logic   :=  '1';
 
 --
 -- Feedback signals
@@ -212,7 +213,7 @@ port map(
     
 );
 
-ext_o(0) <= pulseDP or not dpStatus.running when manualFlag = '0' else pulseDPMan;
+ext_o(0) <= pulseDP or ((not dpStatus.running) and dpOnWhenShutterClosed) when manualFlag = '0' else pulseDPMan;
 ext_o(1) <= shutterDP when manualFlag = '0' else shutterDPMan;
 ext_o(2) <= pulseMW when manualFlag = '0' else pulseMWMan;
 ext_o(3) <= pulseDP;
@@ -241,6 +242,7 @@ dpControl_i.enable <= sharedReg0(0);
 fbControl_i.enable <= sharedReg0(1);
 auxReg0 <= (0 => sharedReg0(2), others => '0');
 fbAuxReg0 <= (0 => sharedReg0(3), others => '0');
+dpOnWhenShutterClosed <= not sharedReg0(4);
 
 manualFlag <= sharedReg0(31);
 pulseDPMan <= sharedReg0(30);
