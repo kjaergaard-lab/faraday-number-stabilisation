@@ -17,6 +17,7 @@ classdef DPFeedback < handle
         enableFB
         enableManualMW
         normalise
+        dpOnShutterOff
         
         width
         numpulses
@@ -117,6 +118,8 @@ classdef DPFeedback < handle
                 .setLimits('lower',0,'upper',1);
             self.enableManualMW = DPFeedbackParameter([3,3],self.sharedReg0)...
                 .setLimits('lower',0,'upper',1);
+            self.dpOnShutterOff = DPFeedbackParameter([4,4],self.sharedReg0)...
+                .setLimits('lower',0,'upper',1);
             
             
             %Pulse generation
@@ -211,6 +214,7 @@ classdef DPFeedback < handle
             self.enableFB.set(0);
             self.enableManualMW.set(0);
             self.normalise.set(0);
+            self.dpOnShutterOff.set(0);
             
             self.width.set(1e-6);
             self.numpulses.set(50);
@@ -325,6 +329,7 @@ classdef DPFeedback < handle
             self.enableFB.get;
             self.enableManualMW.get;
             self.normalise.get;
+            self.dpOnShutterOff.get;
             
             self.width.get;
             self.numpulses.get;
@@ -411,7 +416,11 @@ classdef DPFeedback < handle
                 mm = mm+1;
             end
             self.data = self.data/self.sumWidth.value;
-            self.signal = sqrt(self.data(:,1).^2+self.data(:,2).^2);
+            if self.normalise.value
+                self.signal = self.data(:,1)./self.data(:,2);
+            else
+                self.signal = self.data(:,1);
+            end
             
             self.tPulse = self.period.value*(0:(self.pulsesCollected.value-1))';
         end
@@ -448,6 +457,7 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t         Enable FB: %d\n',self.enableFB.value);
             fprintf(1,'\t\t  Manual MW Pulses: %d\n',self.enableManualMW.value);
             fprintf(1,'\t\t   Power Normalise: %d\n',self.normalise.value);
+            fprintf(1,'\t\t DP on Shutter off: %d\n',self.dpOnShutterOff.value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Pulse Parameters\n');
             fprintf(1,'\t\t       Pulse Width: %.2e s\n',self.width.value);
