@@ -62,6 +62,7 @@ component QuickAvg is
         
         adcData_i   :   in  t_adc_combined;
         adcData_o   :   out t_adc_combined;
+        trig_o      :   out std_logic;
         valid_o     :   out std_logic
     );
 end component;
@@ -122,7 +123,7 @@ end component;
 signal pulse, pulseEOM       :   std_logic   :=  '0';
 signal pulseStatus  :   t_module_status :=  INIT_MODULE_STATUS;
 signal adcAvg   :   t_adc_combined  :=  (others => '0');
-signal validAvg :   std_logic;
+signal validAvg, trigAvg :   std_logic;
 
 signal dataI, dataQ :   signed(23 downto 0) :=  (others => '0');
 signal validIntegrate   :   std_logic   :=  '0';
@@ -213,6 +214,7 @@ port map(
     reg0        =>  avgReg0,
     adcData_i   =>  adcData_i,
     adcData_o   =>  adcAvg,
+    trig_o      =>  trigAvg,
     valid_o     =>  validAvg
 );
 
@@ -223,7 +225,7 @@ generic map(
 port map(
     adcClk      =>  adcClk,
     aresetn     =>  aresetn,
-    trig_i      =>  pulse,
+    trig_i      =>  trigAvg,
     adcData_i   =>  adcAvg,
     valid_i     =>  validAvg,
     reg0        =>  integrateReg0,

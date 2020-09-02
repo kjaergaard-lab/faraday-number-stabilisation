@@ -65,16 +65,6 @@ subEnd <= subStart + width;
 adc1_i <= resize(signed(adcData_i(13 downto 0)),EXT_WIDTH);
 adc2_i <= resize(signed(adcData_i(29 downto 16)),EXT_WIDTH);
 
-TrigSync: process(adcClk,aresetn) is
-begin
-    if aresetn = '0' then
-        trig <= "00";
-    elsif rising_edge(adcClk) then
-        trig <= trig(0) & trig_i;
-    end if;
-end process;
-
-
 SumDiffProc: process(adcClk,aresetn) is
 begin
     if aresetn = '0' then
@@ -92,7 +82,7 @@ begin
                 valid_o <= '0';
                 divValid_i <= '0';
                 validSave_o <= '0';
-                if trig = "01" then
+                if trig_i = '1' then
                     state <= summing;
                     adc1 <= (others => '0');
                     adc2 <= (others => '0');
