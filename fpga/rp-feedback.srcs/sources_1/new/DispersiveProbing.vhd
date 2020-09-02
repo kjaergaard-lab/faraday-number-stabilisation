@@ -145,6 +145,13 @@ signal pulseRegEOM  :   t_param_reg;
 
 begin
 
+--
+-- This process introduces a delay between when the DP pulses finish and when the DP module
+-- says that it is done.  This delay is necessary when the system is set up such that the DP
+-- AOM is kept on when no sequence is running because the DP signal will be raised before
+-- the shutter is closed.  This process makes sure that there is a sufficient delay between
+-- when the shutter is closed and when the module says it is finished running.
+--
 StatusProc: process(sysClk,aresetn) is
 begin
     if aresetn = '0' then
@@ -157,15 +164,20 @@ begin
                 statusCount <= (others => '0');
                 status_o.done <= '0';
                 if pulseStatus.started = '1' then
+                    --Register the module status as started/running when pulses start
                     status_o.started <= '1';
                     status_o.running <= '1';
                 elsif pulseStatus.done = '1' then
+                    --When the pulses are done, start counting the shutter holdoff
                     state <= counting;
                     status_o.started <= '0';
                 else
                     status_o.started <= '0';
                 end if;
 
+            --
+            -- When the shutter holdoff is counted out, indicate that the module is done
+            --
             when counting =>
                 if statusCount < SHUTTER_HOLDOFF then
                     statusCount <= statusCount + 1;
