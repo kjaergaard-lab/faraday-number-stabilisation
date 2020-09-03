@@ -39,31 +39,35 @@ architecture Behavioral of DispersiveProbing is
 
 component PulseGen is
     port(
-        clk         :   in  std_logic;
-        aresetn     :   in  std_logic;  
-        cntrl_i     :   in  t_control;
+        clk         :   in  std_logic;                      --Input clock
+        aresetn     :   in  std_logic;                      --Asynchronous reset
+        cntrl_i     :   in  t_control;                      --Control structure
         
-        reg0        :   in  t_param_reg;
-        reg1        :   in  t_param_reg;
-        reg2        :   in  t_param_reg;
+        --
+        -- Array of parameters:
+        -- 2: delay
+        -- 1: period
+        -- 0: (number of pulses (16), pulse width (16))
+        --
+        regs        :   in  t_param_reg_array(2 downto 0);
         
-        pulse_o     :   out std_logic;
-        status_o    :   out t_module_status
+        pulse_o     :   out std_logic;                      --Output pulse
+        status_o    :   out t_module_status                 --Output module status
     );
 end component;    
 
 component QuickAvg is
     port(
-        clk         :   in  std_logic;
-        aresetn     :   in  std_logic;
-        trig_i      :   in  std_logic;
+        clk         :   in  std_logic;          --Input clock
+        aresetn     :   in  std_logic;          --Asynchronous reset
+        trig_i      :   in  std_logic;          --Input trigger
         
-        reg0        :   in  t_param_reg;
+        reg0        :   in  t_param_reg;        --Parameters: (log2Avgs (4), number of samples (14), delay (14)) 
         
-        adcData_i   :   in  t_adc_combined;
-        adcData_o   :   out t_adc_combined;
-        trig_o      :   out std_logic;
-        valid_o     :   out std_logic
+        adcData_i   :   in  t_adc_combined;     --Input ADC data
+        adcData_o   :   out t_adc_combined;     --Output, averaged ADC data
+        trig_o      :   out std_logic;          --Input trigger delayed by "delay" cycles
+        valid_o     :   out std_logic           --Indicates valid averaged data
     );
 end component;
 

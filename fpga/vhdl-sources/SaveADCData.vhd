@@ -8,15 +8,15 @@ use work.AXI_Bus_Package.all;
 
 entity SaveADCData is
     port(
-        sysClk      :   in  std_logic;
-        adcClk      :   in  std_logic;
-        aresetn     :   in  std_logic;
+        readClk     :   in  std_logic;          --Clock for reading data
+        writeClk    :   in  std_logic;          --Clock for writing data
+        aresetn     :   in  std_logic;          --Asynchronous reset
         
-        data_i      :   in  std_logic_vector;
-        valid_i     :   in  std_logic;
+        data_i      :   in  std_logic_vector;   --Input data, maximum length of 32 bits
+        valid_i     :   in  std_logic;          --High for one clock cycle when data_i is valid
         
-        bus_m       :   in  t_mem_bus_master;
-        bus_s       :   out t_mem_bus_slave
+        bus_m       :   in  t_mem_bus_master;   --Master memory bus
+        bus_s       :   out t_mem_bus_slave     --Slave memory bus
     );
 end SaveADCData;
 
@@ -49,13 +49,13 @@ dina(data_i'length-1 downto 0) <= data_i;
 dina(dina'length-1 downto data_i'length) <= (others => '0');
 
 --
--- Generate adcClk-synchronous address reset signal
+-- Generate writeClk-synchronous address reset signal
 --
-ResetSyncProc: process(adcClk,aresetn) is
+ResetSyncProc: process(writeClk,aresetn) is
 begin
     if aresetn = '0' then
         resetSync <= "00";
-    elsif rising_edge(adcClk) then
+    elsif rising_edge(writeClk) then
         resetSync <= resetSync(0) & bus_m.reset;
     end if;
 end process;
@@ -65,11 +65,11 @@ end process;
 --
 BlockMem : BlockMemory32x14
 PORT MAP (
-    clka => adcClk,
+    clka => writeClk,
     wea => wea,
     addra => std_logic_vector(addra),
     dina => dina,
-    clkb => sysClk,
+    clkb => readClk,
     addrb => std_logic_vector(bus_m.addr),
     doutb => bus_s.data
 );
@@ -81,12 +81,12 @@ PORT MAP (
 --
 wea(0) <= valid_i;
 -- bus_s.last <= addra;
-WriteProc: process(adcClk,aresetn) is
+WriteProc: process(writeClk,aresetn) is
 begin
     if aresetn = '0' then
         addra <= (others => '0');
         bus_s.last <= (others => '0');
-    elsif rising_edge(adcClk) then
+    elsif rising_edge(writeClk) then
         if resetSync = "01" then
             addra <= (others => '0');
         elsif valid_i = '1' and addra < (addra'range => '1') then
@@ -100,13 +100,13 @@ end process;
 -- Reads data from the memory address provided by the user
 -- Note that we need an extra clock cycle to read data compared to writing it
 --
-ReadProc: process(sysClk,aresetn) is
+ReadProc: process(readClk,aresetn) is
 begin
     if aresetn = '0' then
         state <= 0;
         bus_s.valid <= '0';
         bus_s.status <= idle;
-    elsif rising_edge(sysClk) then
+    elsif rising_edge(readClk) then
         if state = 0 and bus_m.trig = '1' then
             state <= 1;
             bus_s.valid <= '0';

@@ -6,16 +6,20 @@ use work.CustomDataTypes.all;
 
 entity PulseGen is
     port(
-        clk         :   in  std_logic;
-        aresetn     :   in  std_logic;  
-        cntrl_i     :   in  t_control;
+        clk         :   in  std_logic;                      --Input clock
+        aresetn     :   in  std_logic;                      --Asynchronous reset
+        cntrl_i     :   in  t_control;                      --Control structure
         
-        reg0        :   in  t_param_reg;
-        reg1        :   in  t_param_reg;
-        reg2        :   in  t_param_reg;
+        --
+        -- Array of parameters:
+        -- 2: delay
+        -- 1: period
+        -- 0: (number of pulses (16), pulse width (16))
+        --
+        regs        :   in  t_param_reg_array(2 downto 0);
         
-        pulse_o     :   out std_logic;
-        status_o    :   out t_module_status
+        pulse_o     :   out std_logic;                      --Output pulse
+        status_o    :   out t_module_status                 --Output module status
     );
 end PulseGen;
 
@@ -36,10 +40,10 @@ signal pulseCount   :   unsigned(numPulses'length-1 downto 0)   :=  (others => '
 
 begin
 
-numPulses <= resize(unsigned(reg0(31 downto 16)),numPulses'length);
-width <= resize(unsigned(reg0(15 downto 0)),width'length);
-period <= unsigned(reg1);
-delay <= unsigned(reg2);
+numPulses <= resize(unsigned(regs(0)(31 downto 16)),numPulses'length);
+width <= resize(unsigned(regs(0)(15 downto 0)),width'length);
+period <= unsigned(regs(1));
+delay <= unsigned(regs(2));
 
 TrigSync: process(clk,aresetn) is
 begin
