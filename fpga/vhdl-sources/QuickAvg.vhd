@@ -26,7 +26,7 @@ constant PADDING    :   natural :=  8;
 constant EXT_WIDTH  :   natural :=  adcData_i'length/2+PADDING; 
 
 signal trigSync     :   std_logic_vector(1 downto 0)    :=  "00";
-signal trig         :   std_logic               :=  '0';
+signal trig, trigOld:   std_logic               :=  '0';
 signal count        :   unsigned(31 downto 0)   :=  (others => '0');
 
 signal delay        :   unsigned(13 downto 0)   :=  (others => '0');
@@ -53,14 +53,14 @@ adc2_tmp <= resize(signed(adcData_i(31 downto 16)),adc2_tmp'length);
 
 trig_o <= trig;
 
-TrigSyncProc: process(clk,aresetn) is
-begin
-    if aresetn = '0' then
-        trigSync <= "00";
-    elsif rising_edge(clk) then
-        trigSync <= trigSync(0) & trig_i;
-    end if;
-end process;
+--TrigSyncProc: process(clk,aresetn) is
+--begin
+--    if aresetn = '0' then
+--        trigSync <= "00";
+--    elsif rising_edge(clk) then
+--        trigSync <= trigSync(0) & trig_i;
+--    end if;
+--end process;
 
 TrigDelay: process(clk,aresetn) is
 begin
@@ -72,9 +72,14 @@ begin
         DelayFSM: case delayState is
             when idle =>
                 trig <= '0';
-                if trigSync = "01" then
-                    delayCount <= (others => '0');
-                    delayState <= waiting;
+                trigOld <= trig_i;
+                if trigOld = '0' and trig_i = '1' then
+                    if delay = 0 then
+                        trig <= '1';
+                    else
+                        delayCount <= (others => '0');
+                        delayState <= waiting;
+                    end if;
                 end if;
                 
             when waiting =>

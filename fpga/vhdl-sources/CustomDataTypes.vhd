@@ -14,8 +14,10 @@ package CustomDataTypes is
 constant PARAM_WIDTH        :   natural :=  32;
 constant ADC_WIDTH          :   natural :=  16;
 constant INTEG_WIDTH        :   natural :=  ADC_WIDTH + 8;
+constant GAIN_WIDTH         :   natural :=  ADC_WIDTH;
 constant SIGNAL_FRAC_WIDTH  :   natural :=  16;
-constant SIGNAL_WIDTH       :   natural :=  INTEG_WIDTH + SIGNAL_FRAC_WIDTH;
+constant SIGNAL_WIDTH       :   natural :=  24;
+
 constant PULSE_NUM_WIDTH    :   natural :=  16;
 
 subtype t_param_reg is std_logic_vector(PARAM_WIDTH-1 downto 0);
@@ -24,6 +26,9 @@ type t_param_reg_array is array(natural range <>) of t_param_reg;
 subtype t_adc_combined is std_logic_vector(31 downto 0);
 subtype t_adc_integrated is signed(INTEG_WIDTH-1 downto 0);
 type t_adc_integrated_array is array(natural range <>) of t_adc_integrated;
+
+subtype t_gain is signed(GAIN_WIDTH-1 downto 0);
+type t_gain_array is array(natural range <>) of t_gain;
 
 --
 -- Defines AXI address and data widths

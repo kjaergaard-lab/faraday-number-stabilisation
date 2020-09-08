@@ -40,7 +40,7 @@ signal state        :   t_status_local    :=  idle;
 -- Signals for integrating data
 --
 signal sumStart, sumEnd, subStart, subEnd, width, count     :   unsigned(10 downto 0)    :=  (others => '0');
-signal adc, adc_i, offsets                                  :   t_adc_integrated_array    :=  (others => (others => '0'));
+signal adc, adc_i, offsets                                  :   t_adc_integrated_array(1 downto 0)    :=  (others => (others => '0'));
 signal usePresetOffsets                                     :   std_logic;
 
 begin
@@ -61,8 +61,8 @@ sumEnd <= sumStart + width;
 subEnd <= subStart + width;
 
 usePresetOffsets <= regs(1)(28);
-offsets(0) <= resize(signed(regs(1)(13 downto 0)),INTEG_WIDTH-1);
-offsets(1) <= resize(signed(regs(1)(27 downto 14)),INTEG_WIDTH-1);
+offsets(0) <= resize(signed(regs(1)(13 downto 0)),INTEG_WIDTH);
+offsets(1) <= resize(signed(regs(1)(27 downto 14)),INTEG_WIDTH);
 
 
 SumDiffProc: process(clk,aresetn) is

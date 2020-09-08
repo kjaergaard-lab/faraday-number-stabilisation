@@ -71,28 +71,65 @@ component DualChannelAcquisition is
     );
 end component;
 
+component ComputeGain is
+    port(
+        clk         :   in  std_logic;                          --Input clock
+        aresetn     :   in  std_logic;                          --Asynchronous reset
+        
+        data_i      :   in  t_adc_integrated_array(1 downto 0); --Input integrated data
+        valid_i     :   in  std_logic;                          --High for one clock cycle when data_i is valid
+
+        multipliers :   in  t_param_reg;                        --Multiplication factors (X (16), ADC1 factor (8), ADC2 factor (8))
+        
+        gain_o      :   out t_gain_array(1 downto 0);           --Output gain values
+        valid_o     :   out std_logic                           --High for one clock cycle when gain_o is valid
+    );
+end component;
+
+component ComputeSignal is
+    port(
+        clk         :   in  std_logic;                              --Clock synchronous with data_i
+        aresetn     :   in  std_logic;                              --Asynchronous reset
+        
+        data_i      :   in  t_adc_integrated_array(1 downto 0);     --Input integrated data on two channels
+        valid_i     :   in  std_logic;                              --High for one cycle when data_i is valid
+        
+        gain_i      :   in  t_gain_array(1 downto 0);               --Input gain values on two channels
+        validGain_i :   in  std_logic;                              --High for one cycle when gain_i is valid
+        
+        useFixedGain:   in  std_logic;                              --Use fixed gain multipliers
+        multipliers :   in  t_param_reg;                            --Fixed gain multipliers (ch 1 (16), ch 0 (16))
+        
+        ratio_o     :   out unsigned(SIGNAL_WIDTH-1 downto 0);      --Output division signal
+        valid_o     :   out std_logic                               --High for one cycle when ratio_o is valid
+    );
+end component;
+
 component NumberStabilisation is
     port(
-        sysClk          :   in  std_logic;
-        adcClk          :   in  std_logic;
-        aresetn         :   in  std_logic;
-        cntrl_i         :   in  t_control;
+        clk             :   in  std_logic;                          --Clock signal synchronous with ratio_i
+        aresetn         :   in  std_logic;                          --Asynchronous clock signal
+        cntrl_i         :   in  t_control;                          --Input control signals
         
-        computeReg0     :   in  t_param_reg;
-        computeReg1     :   in  t_param_reg;
-        computeReg2     :   in  t_param_reg;
-        computeReg3     :   in  t_param_reg;
+        --
+        -- Computation registers
+        -- In descending order, concatenating arrays:
+        -- (tolerance (24), target (24), maximum number of pulses (16))
+        --
+        computeRegs     :   in  t_param_reg_array(1 downto 0);
+        --
+        -- Pulse parameter registers
+        -- 0 : (manual number of pulses (16), pulse width (16))
+        -- 1 : (pulse period (32))
+        --
+        pulseRegs_i     :   in  t_param_reg_array(1 downto 0);
+        auxReg          :   in  t_param_reg;                        --Auxiliary register (X (31), enable software triggers (1))
         
-        pulseReg0       :   in  t_param_reg;
-        pulseReg1       :   in  t_param_reg;
+        ratio_i         :   in  unsigned(SIGNAL_WIDTH-1 downto 0);  --Input signal as a ratio
+        valid_i         :   in  std_logic;                          --High for one cycle when ratio_i is valid
         
-        auxReg0         :   in  t_param_reg;
-        
-        quad_i          :   in  unsigned(QUAD_WIDTH-1 downto 0);
-        valid_i         :   in  std_logic;
-        
-        cntrl_o         :   out t_control;
-        pulse_o         :   out std_logic
+        cntrl_o         :   out t_control;                          --Output control signal
+        pulse_o         :   out std_logic                           --Output microwave pulses
     );
 end component;
 
@@ -154,13 +191,31 @@ signal dataIntAux           :   t_adc_integrated_array(1 downto 0)  :=  (others 
 signal validIntAux          :   std_logic                       :=  '0';
 
 --
+-- Gain computation signals
+--
+signal gainMultipliers      :   t_param_reg                     :=  (others => '0');
+signal gain                 :   t_gain_array(1 downto 0)        :=  (others => (others => '0'));
+signal gainValid            :   std_logic                       :=  '0';
+
+--
+-- Signal computation signals
+--
+signal useFixedGain         :   std_logic;
+signal fixedGains           :   t_param_reg                     :=  (others => '0');
+signal ratio                :   unsigned(SIGNAL_WIDTH-1 downto 0)   :=  (others => '0');
+signal ratioValid           :   std_logic                       :=  '0';
+
+--
 -- Feedback signals
 --
-signal fbControl_i, fbControl_o     :   t_control   :=  INIT_CONTROL_ENABLED;
-signal fbComputeReg0, fbComputeReg1, fbComputeReg2, fbComputeReg3   :   t_param_reg :=  (others => '0');
-signal fbPulseReg0, fbPulseReg1     :   t_param_reg :=  (others => '0');
-signal fbAuxReg0                    :   t_param_reg :=  (others => '0');
-signal pulseMW, pulseMWMan                      :   std_logic;
+signal fbControl_i          :   t_control                       :=  INIT_CONTROL_ENABLED;
+signal fbControl_o          :   t_control                       :=  INIT_CONTROL_ENABLED;
+signal fbComputeRegs        :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
+signal fbPulseRegs          :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
+signal fbAuxReg             :   t_param_reg                     :=  (others => '0');
+
+signal pulseMW              :   std_logic;
+signal pulseMWMan           :   std_logic;
 
 --
 -- Block memory signals
@@ -228,27 +283,58 @@ port map(
 );
 
 --
+-- Compute the gain values from the auxiliary measuremnts
+--
+GainComputation: ComputeGain
+port map(
+    clk             =>  adcClk,
+    aresetn         =>  aresetn,
+    
+    data_i          =>  dataIntAux,
+    valid_i         =>  validIntAux,
+
+    multipliers     =>  gainMultipliers,
+
+    gain_o          =>  gain,
+    valid_o         =>  gainValid
+);
+
+--
+-- Compute the ratio S_-/S_+
+--
+SignalComputation: ComputeSignal
+port map(
+    clk             =>  adcClk,
+    aresetn         =>  aresetn,
+
+    data_i          =>  dataIntSignal,
+    valid_i         =>  validIntSignal,
+
+    gain_i          =>  gain,
+    validGain_i     =>  gainValid,
+
+    useFixedGain    =>  useFixedGain,
+    multipliers     =>  fixedGains,
+
+    ratio_o         =>  ratio,
+    valid_o         =>  ratioValid
+);
+
+--
 -- Creates the component that actually performs number stabilisation
 --
 StabiliseNumber: NumberStabilisation
 port map(
-    sysClk          =>  sysClk,
-    adcClk          =>  adcClk,
+    clk             =>  adcClk,
     aresetn         =>  aresetn,
     cntrl_i         =>  fbControl_i,
+
+    computeRegs     =>  fbComputeRegs,
+    pulseRegs_i     =>  fbPulseRegs,
+    auxReg          =>  fbAuxReg,
     
-    computeReg0     =>  fbComputeReg0,
-    computeReg1     =>  fbComputeReg1,
-    computeReg2     =>  fbComputeReg2,
-    computeReg3     =>  fbComputeReg3,
-    
-    pulseReg0       =>  fbPulseReg0,
-    pulseReg1       =>  fbPulseReg1,
-    
-    auxReg0         =>  fbAuxReg0,
-    
-    quad_i          =>  quadSignal,
-    valid_i         =>  quadValid,
+    ratio_i         =>  ratio,
+    valid_i         =>  ratioValid,
     
     cntrl_o         =>  fbControl_o,
     pulse_o         =>  pulseMW
@@ -284,8 +370,8 @@ fbControl_i.start <= triggers(1) or trig;
 
 acqControl_i.enable <= sharedReg(0);
 fbControl_i.enable <= sharedReg(1);
---auxReg <= (0 => sharedReg(2), others => '0');
-fbAuxReg0 <= (0 => sharedReg(3), others => '0');
+useFixedGain <= sharedReg(2);
+fbAuxReg <= (0 => sharedReg(3), others => '0');
 signalDefaultState <= not sharedReg(4);
 auxDefaultState <= not sharedReg(5);
 
@@ -370,12 +456,10 @@ begin
                             when X"000018" => rw(bus_m,bus_s,comState,avgReg);
                             when X"00001C" => rw(bus_m,bus_s,comState,integrateRegs(0));
                             when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(1));
-                            when X"000024" => rw(bus_m,bus_s,comState,fbComputeReg0);
-                            when X"000028" => rw(bus_m,bus_s,comState,fbComputeReg1);
-                            when X"00002C" => rw(bus_m,bus_s,comState,fbComputeReg2);
-                            when X"000030" => rw(bus_m,bus_s,comState,fbComputeReg3);
-                            when X"000034" => rw(bus_m,bus_s,comState,fbPulseReg0);
-                            when X"000038" => rw(bus_m,bus_s,comState,fbPulseReg1);
+                            when X"000024" => rw(bus_m,bus_s,comState,fbComputeRegs(0));
+                            when X"000028" => rw(bus_m,bus_s,comState,fbComputeRegs(1));
+                            when X"00002C" => rw(bus_m,bus_s,comState,fbPulseRegs(0));
+                            when X"000030" => rw(bus_m,bus_s,comState,fbPulseRegs(1));
                             
                             
                             when others => 
