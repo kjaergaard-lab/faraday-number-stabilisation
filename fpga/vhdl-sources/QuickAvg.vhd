@@ -69,22 +69,27 @@ begin
         trig <= '0';
         delayState <= idle;
     elsif rising_edge(clk) then
+    
+        trigOld <= trig_i;
+        
         DelayFSM: case delayState is
             when idle =>
-                trig <= '0';
-                trigOld <= trig_i;
                 if trigOld = '0' and trig_i = '1' then
                     if delay = 0 then
                         trig <= '1';
                     else
+                        trig <= '0';
                         delayCount <= (others => '0');
                         delayState <= waiting;
                     end if;
+                else
+                    trig <= '0';
                 end if;
                 
             when waiting =>
                 if delayCount < delay then
                     delayCount <= delayCount + 1;
+                    trig <= '0';
                 else
                     delayState <= idle;
                     trig <= '1';

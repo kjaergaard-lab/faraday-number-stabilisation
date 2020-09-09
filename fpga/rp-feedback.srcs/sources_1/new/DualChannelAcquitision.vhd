@@ -198,7 +198,7 @@ end process;
 
 LaserPulses: PulseGen
 port map(
-    clk     =>  sysClk,
+    clk     =>  adcClk,
     aresetn =>  aresetn,
     cntrl_i =>  cntrl_i,
     regs    =>  pulseRegs,

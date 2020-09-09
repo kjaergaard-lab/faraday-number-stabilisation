@@ -28,7 +28,7 @@ classdef DPFeedbackClient < handle
         end
         
         function open(self)
-            self.client = tcpclient(self.host,self.TCP_PORT,'Timeout',1,'ConnectTimeout',1);
+            self.client = tcpclient(self.host,self.TCP_PORT,'Timeout',5,'ConnectTimeout',5);
         end
         
         function close(self)
@@ -84,8 +84,9 @@ classdef DPFeedbackClient < handle
                     end
                 end
                 self.close
-            catch
+            catch e
                 self.close;
+                rethrow(e);
             end
         end
         

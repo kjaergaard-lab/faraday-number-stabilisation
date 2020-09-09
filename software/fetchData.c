@@ -50,10 +50,27 @@ argv[0] is the function name, and argv[n] is the n'th input argument*/
     perror("open");
     return 1;
   }
-  if (fetchType == 0) {
+
+  switch (fetchType) {
+    case 0:
       memLocation = 0x42000000;
-  } else {
+      break;
+
+    case 1:
       memLocation = 0x43000000;
+      break;
+
+    case 2:
+      memLocation = 0x44000000;
+      break;
+
+    case 3:
+      memLocation = 0x45000000;
+      break;
+
+    case 4:
+      memLocation = 0x46000000;
+      break;
   }
   /*mmap maps the memory location 0x40000000 to the pointer cfg, which "points" to that location in memory.*/
   cfg = mmap(0,MAP_SIZE,PROT_READ|PROT_WRITE,MAP_SHARED,fd,memLocation);

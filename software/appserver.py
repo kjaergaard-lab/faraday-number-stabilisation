@@ -16,7 +16,7 @@ def acceptWrapper(sock):
     sel.register(conn,selectors.EVENT_READ,data=message)
 
 # host = "127.0.0.1"
-r = subprocess.run(['hostname','-I'],stdout=subprocess.PIPE)
+r = subprocess.run(['./get_ip.sh'],stdout=subprocess.PIPE)
 host = r.stdout.decode('ascii').rstrip()
 port = 6666
 lsock = socket.socket(socket.AF_INET,socket.SOCK_STREAM)

@@ -133,6 +133,20 @@ component NumberStabilisation is
     );
 end component;
 
+component SaveADCData is
+    port(
+        readClk     :   in  std_logic;          --Clock for reading data
+        writeClk    :   in  std_logic;          --Clock for writing data
+        aresetn     :   in  std_logic;          --Asynchronous reset
+        
+        data_i      :   in  std_logic_vector;   --Input data, maximum length of 32 bits
+        valid_i     :   in  std_logic;          --High for one clock cycle when data_i is valid
+        
+        bus_m       :   in  t_mem_bus_master;   --Master memory bus
+        bus_s       :   out t_mem_bus_slave     --Slave memory bus
+    );
+end component;
+
 --
 -- AXI communication signals
 --
@@ -165,6 +179,7 @@ signal acqControl_i         :   t_control                       :=  INIT_CONTROL
 --
 -- Signal acquisition signals
 --
+signal cntrlSignal_i        :   t_control                       :=  INIT_CONTROL_ENABLED;
 signal pulseSignal          :   std_logic;
 signal shutterSignal        :   std_logic;
 signal statusSignal         :   t_module_status                 :=  INIT_MODULE_STATUS;
@@ -179,6 +194,7 @@ signal validIntSignal       :   std_logic                       :=  '0';
 --
 -- Auxiliary acquisition signals
 --
+signal cntrlAux_i           :   t_control                       :=  INIT_CONTROL_ENABLED;
 signal pulseAux             :   std_logic;
 signal shutterAux           :   std_logic;
 signal statusAux            :   t_module_status                 :=  INIT_MODULE_STATUS;
@@ -236,7 +252,7 @@ port map(
     adcClk          =>  adcClk,
     aresetn         =>  aresetn,
 
-    cntrl_i         =>  acqControl_i,
+    cntrl_i         =>  cntrlSignal_i,
     adcData_i       =>  adcData_i,
 
     pulseRegs       =>  pulseRegsSignal,
@@ -264,7 +280,7 @@ port map(
     adcClk          =>  adcClk,
     aresetn         =>  aresetn,
 
-    cntrl_i         =>  acqControl_i,
+    cntrl_i         =>  cntrlAux_i,
     adcData_i       =>  adcData_i,
 
     pulseRegs       =>  pulseRegsAux,
@@ -361,14 +377,23 @@ readData_o <= bus_s.data;
 resp_o <= bus_s.resp;
 
 --
+-- Assigns appropriate values to pulse registers
+--
+pulseRegsSignal(1 downto 0) <= pulseRegs(1 downto 0);
+pulseRegsAux(1 downto 0) <= pulseRegs(1 downto 0);
+
+--
 -- Shared registers
 --
 trig <= ext_i(0);
-acqControl_i.start <= triggers(0) or trig;
-acqControl_i.stop <= fbControl_o.stop;
+cntrlSignal_i.start <= triggers(0) or trig;
+cntrlSignal_i.stop <= fbControl_o.stop;
+cntrlAux_i.start <= triggers(0) or trig;
+cntrlAux_i.stop <= fbControl_o.stop;
 fbControl_i.start <= triggers(1) or trig;
 
-acqControl_i.enable <= sharedReg(0);
+cntrlSignal_i.enable <= sharedReg(0);
+cntrlAux_i.enable <= sharedReg(0) and (not useFixedGain);
 fbControl_i.enable <= sharedReg(1);
 useFixedGain <= sharedReg(2);
 fbAuxReg <= (0 => sharedReg(3), others => '0');
@@ -389,10 +414,10 @@ shutterAuxMan <= sharedReg(26);
 -- This sequence ensures that the memories are reset either on 
 -- the receipt of a reset signal or when the pulses are started
 --
-mem_bus_m(0).reset <= reset or acqControl_i.start;
-mem_bus_m(1).reset <= reset or acqControl_i.start;
-mem_bus_m(2).reset <= reset or acqControl_i.start;
-mem_bus_m(3).reset <= reset or acqControl_i.start;
+mem_bus_m(0).reset <= reset or cntrlSignal_i.start;
+mem_bus_m(1).reset <= reset or cntrlSignal_i.start;
+mem_bus_m(2).reset <= reset or cntrlAux_i.start;
+mem_bus_m(3).reset <= reset or cntrlAux_i.start;
 
 --
 -- Define useful signals for parsing AXI communications
@@ -456,10 +481,12 @@ begin
                             when X"000018" => rw(bus_m,bus_s,comState,avgReg);
                             when X"00001C" => rw(bus_m,bus_s,comState,integrateRegs(0));
                             when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(1));
-                            when X"000024" => rw(bus_m,bus_s,comState,fbComputeRegs(0));
-                            when X"000028" => rw(bus_m,bus_s,comState,fbComputeRegs(1));
-                            when X"00002C" => rw(bus_m,bus_s,comState,fbPulseRegs(0));
-                            when X"000030" => rw(bus_m,bus_s,comState,fbPulseRegs(1));
+                            when X"000024" => rw(bus_m,bus_s,comState,gainMultipliers);
+                            when X"000028" => rw(bus_m,bus_s,comState,fixedGains);
+                            when X"00002C" => rw(bus_m,bus_s,comState,fbComputeRegs(0));
+                            when X"000030" => rw(bus_m,bus_s,comState,fbComputeRegs(1));
+                            when X"000034" => rw(bus_m,bus_s,comState,fbPulseRegs(0));
+                            when X"000038" => rw(bus_m,bus_s,comState,fbPulseRegs(1));
                             
                             
                             when others => 

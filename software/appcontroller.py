@@ -15,10 +15,12 @@ def write(data,header):
         cmd = ['monitor',format(addr),'0x' + '{:0>8x}'.format(data[1])]
     elif header["mode"] == "read":
         cmd = ['monitor',format(addr)]
-    elif header["mode"] == "fetch raw":
-        cmd = ['./fetchData',format(header["numFetch"]),'0']
-    elif header["mode"] == "fetch processed":
-        cmd = ['./fetchData',format(header["numFetch"]),'1']
+    elif header["mode"] == "fetch data":
+        cmd = ['./fetchData',format(header["numFetch"]),format(header["fetchType"])]
+    # elif header["mode"] == "fetch raw":
+    #     cmd = ['./fetchData',format(header["numFetch"]),'0']
+    # elif header["mode"] == "fetch processed":
+    #     cmd = ['./fetchData',format(header["numFetch"]),'1']
 
     if ("print" in header) and (header["print"]):
         print("Command: ",cmd)
