@@ -30,7 +30,7 @@ PORT (
 );
 END COMPONENT;
 
-constant MULT_LATENCY   :   natural range 0 to 7    :=  3;
+constant MULT_LATENCY   :   natural range 0 to 7    :=  4;
 
 type t_status_local is (idle, multiplying, ouput);
 signal state        :   t_status_local  :=  idle;
@@ -81,8 +81,8 @@ begin
                 if count <  MULT_LATENCY then
                     count <= count + 1;
                 else
-                    gain_o(0) <= resize(shift_right(signed(gain_slv(0)),16),GAIN_WIDTH);
-                    gain_o(1) <= resize(shift_right(signed(gain_slv(1)),16),GAIN_WIDTH);
+                    gain_o(0) <= resize(signed(gain_slv(0)),GAIN_WIDTH);
+                    gain_o(1) <= resize(signed(gain_slv(1)),GAIN_WIDTH);
                     valid_o <= '1';
                     state <= idle;
                 end if;

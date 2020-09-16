@@ -14,9 +14,9 @@ package CustomDataTypes is
 constant PARAM_WIDTH        :   natural :=  32;
 constant ADC_WIDTH          :   natural :=  16;
 constant INTEG_WIDTH        :   natural :=  ADC_WIDTH + 8;
-constant GAIN_WIDTH         :   natural :=  ADC_WIDTH;
+constant GAIN_WIDTH         :   natural :=  INTEG_WIDTH + 8;
 constant SIGNAL_FRAC_WIDTH  :   natural :=  16;
-constant SIGNAL_WIDTH       :   natural :=  24;
+constant SIGNAL_WIDTH       :   natural :=  SIGNAL_FRAC_WIDTH;
 
 constant PULSE_NUM_WIDTH    :   natural :=  16;
 

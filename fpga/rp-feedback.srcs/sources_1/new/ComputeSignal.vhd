@@ -17,9 +17,9 @@ entity ComputeSignal is
         validGain_i :   in  std_logic;                              --High for one cycle when gain_i is valid
         
         useFixedGain:   in  std_logic;                              --Use fixed gain multipliers
-        multipliers :   in  t_param_reg;                            --Fixed gain multipliers (ch 1 (16), ch 0 (16))
+        multipliers :   in  t_param_reg_array(1 downto 0);          --Fixed gain multipliers, 32 bits each
         
-        ratio_o     :   out unsigned(SIGNAL_WIDTH-1 downto 0);      --Output division signal
+        ratio_o     :   out signed(SIGNAL_WIDTH-1 downto 0);        --Output division signal
         valid_o     :   out std_logic                               --High for one cycle when ratio_o is valid
     );
 end ComputeSignal;
@@ -29,9 +29,9 @@ architecture Behavioral of ComputeSignal is
 COMPONENT SignalGainMultiplier
   PORT (
     CLK : IN STD_LOGIC;
-    A : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
-    B : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
-    P : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
+    A : IN STD_LOGIC_VECTOR(23 DOWNTO 0);
+    B : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+    P : OUT STD_LOGIC_VECTOR(55 DOWNTO 0)
   );
 END COMPONENT;
 
@@ -40,23 +40,23 @@ COMPONENT SignalDivider
     aclk : IN STD_LOGIC;
     s_axis_divisor_tvalid : IN STD_LOGIC;
     s_axis_divisor_tready : OUT STD_LOGIC;
-    s_axis_divisor_tdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+    s_axis_divisor_tdata : IN STD_LOGIC_VECTOR(55 DOWNTO 0);
     s_axis_dividend_tvalid : IN STD_LOGIC;
     s_axis_dividend_tready : OUT STD_LOGIC;
-    s_axis_dividend_tdata : IN STD_LOGIC_VECTOR(47 DOWNTO 0);
+    s_axis_dividend_tdata : IN STD_LOGIC_VECTOR(55 DOWNTO 0);
     m_axis_dout_tvalid : OUT STD_LOGIC;
-    m_axis_dout_tdata : OUT STD_LOGIC_VECTOR(79 DOWNTO 0)
+    m_axis_dout_tdata : OUT STD_LOGIC_VECTOR(71 DOWNTO 0)
   );
 END COMPONENT;
 
-type t_signal_slv is array(1 downto 0) of std_logic_vector(ADC_WIDTH-1 downto 0);
+type t_signal_slv is array(1 downto 0) of std_logic_vector(INTEG_WIDTH-1 downto 0);
 type t_gain_slv is array(1 downto 0) of std_logic_vector(GAIN_WIDTH-1 downto 0);
-type t_prod_slv is array(1 downto 0) of std_logic_vector(ADC_WIDTH+GAIN_WIDTH-1 downto 0);
+type t_prod_slv is array(1 downto 0) of std_logic_vector(INTEG_WIDTH+GAIN_WIDTH-1 downto 0);
 
 type t_status_local is (idle,multiplying,waiting_signal,waiting_gain,dividing);
 
-constant MULT_LATENCY   :   natural                         :=  3;
-constant DIV_LATENCY    :   natural                         :=  57;
+constant MULT_LATENCY   :   natural                         :=  7;
+constant DIV_LATENCY    :   natural                         :=  85;
 
 signal state            :   t_status_local                  :=  idle;
 signal count            :   natural range 0 to 255          :=  0;
@@ -65,12 +65,14 @@ signal count            :   natural range 0 to 255          :=  0;
 signal signal_slv       :   t_signal_slv                    :=  (others => (others => '0'));
 signal gain_slv         :   t_gain_slv                      :=  (others => (others => '0'));
 signal prod_slv         :   t_prod_slv                      :=  (others => (others => '0'));
-signal sum_slv          :   std_logic_vector(31 downto 0)   :=  (others => '0');
-signal diff_slv         :   std_logic_vector(47 downto 0)   :=  (others => '0');
+signal sum_slv          :   std_logic_vector(55 downto 0)   :=  (others => '0');
+signal diff_slv         :   std_logic_vector(55 downto 0)   :=  (others => '0');
 
 signal prod_valid       :   std_logic                       :=  '0';
 signal div_valid        :   std_logic;
-signal div_o            :   std_logic_vector(79 downto 0);
+signal div_o            :   std_logic_vector(71 downto 0);
+
+signal div_int, div_frac:   signed(SIGNAL_WIDTH-1 downto 0) :=  (others => '0');
 
 signal fixedGain_slv    :   t_gain_slv;
 
@@ -79,20 +81,20 @@ begin
 --
 -- Parse parameters
 --
-fixedGain_slv(0) <= multipliers(GAIN_WIDTH-1 downto 0);
-fixedGain_slv(1) <= multipliers(PARAM_WIDTH-1 downto GAIN_WIDTH);
+--fixedGain_slv(0) <= multipliers(GAIN_WIDTH-1 downto 0);
+--fixedGain_slv(1) <= multipliers(PARAM_WIDTH-1 downto GAIN_WIDTH);
 
 --
 -- Convert signal data
 --
-signal_slv(0) <= std_logic_vector(resize(shift_right(data_i(0),8),ADC_WIDTH));
-signal_slv(1) <= std_logic_vector(resize(shift_right(data_i(1),8),ADC_WIDTH));
+signal_slv(0) <= std_logic_vector(data_i(0));
+signal_slv(1) <= std_logic_vector(data_i(1));
 
 --
 -- Note the reversal of the indices so that we get g_0 x S_1 and g_1 x S_0
 --
-gain_slv(0) <= std_logic_vector(gain_i(1)) when useFixedGain = '0' else fixedGain_slv(1);
-gain_slv(1) <= std_logic_vector(gain_i(0)) when useFixedGain = '0' else fixedGain_slv(0);
+gain_slv(0) <= std_logic_vector(gain_i(1)) when useFixedGain = '0' else multipliers(1);
+gain_slv(1) <= std_logic_vector(gain_i(0)) when useFixedGain = '0' else multipliers(0);
 
 --
 -- Multiply signals
@@ -119,6 +121,9 @@ port map(
     m_axis_dout_tdata       =>  div_o
 );
 
+div_int <= resize(signed(div_o(div_o'length-1 downto 16)),SIGNAL_WIDTH);
+div_frac <= resize(signed(div_o(15 downto 0)),SIGNAL_WIDTH);
+
 MainProc: process(clk,aresetn) is
 begin
     if aresetn = '0' then
@@ -134,18 +139,19 @@ begin
             when idle =>
                 valid_o <= '0';
                 prod_valid <= '0';
-                if useFixedGain = '1' and valid_i = '1' then
-                    count <= 0;
-                    state <= multiplying;
-                elsif valid_i = '1' and validGain_i = '1' then
-                    count <= 0;
-                    state <= multiplying;
-                elsif valid_i = '1' then
-                    count <= 0;
-                    state <= waiting_gain;
-                elsif validGain_i = '1' then
-                    count <= 0;
-                    state <= waiting_signal;
+                count <= 0;
+                if useFixedGain = '1' then
+                    if valid_i = '1' then
+                        state <= multiplying;
+                    end if;
+                else
+                    if valid_i = '1' and validGain_i = '1' then
+                        state <= multiplying;
+                    elsif valid_i = '1' then
+                        state <= waiting_gain;
+                    elsif validGain_i = '1' then
+                        state <= waiting_signal;
+                    end if;
                 end if;
                 
             when waiting_gain =>
@@ -164,8 +170,8 @@ begin
                 else
                     count <= 0;
                     prod_valid <= '1';
-                    sum_slv <= std_logic_vector(signed(prod_slv(0))+signed(prod_slv(1)));
-                    diff_slv <= std_logic_vector(shift_left(resize(signed(prod_slv(0))-signed(prod_slv(1)),diff_slv'length),SIGNAL_FRAC_WIDTH));
+                    sum_slv <= std_logic_vector(signed(prod_slv(0)) + signed(prod_slv(1)));
+                    diff_slv <= std_logic_vector(signed(prod_slv(0)) - signed(prod_slv(1)));
                     state <= dividing;
                 end if;
                 
@@ -175,7 +181,7 @@ begin
                     count <= count + 1;
                 else
                     count <= 0;
-                    ratio_o <= resize(unsigned(abs(signed(div_o(div_o'length-1 downto 32)))),ratio_o'length);
+                    ratio_o <= div_frac;
                     valid_o <= '1';
                     state <= idle;
                 end if;

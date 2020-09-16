@@ -98,9 +98,9 @@ component ComputeSignal is
         validGain_i :   in  std_logic;                              --High for one cycle when gain_i is valid
         
         useFixedGain:   in  std_logic;                              --Use fixed gain multipliers
-        multipliers :   in  t_param_reg;                            --Fixed gain multipliers (ch 1 (16), ch 0 (16))
+        multipliers :   in  t_param_reg_array(1 downto 0);          --Fixed gain multipliers, 32 bits each
         
-        ratio_o     :   out unsigned(SIGNAL_WIDTH-1 downto 0);      --Output division signal
+        ratio_o     :   out signed(SIGNAL_WIDTH-1 downto 0);        --Output division signal
         valid_o     :   out std_logic                               --High for one cycle when ratio_o is valid
     );
 end component;
@@ -125,7 +125,7 @@ component NumberStabilisation is
         pulseRegs_i     :   in  t_param_reg_array(1 downto 0);
         auxReg          :   in  t_param_reg;                        --Auxiliary register (X (31), enable software triggers (1))
         
-        ratio_i         :   in  unsigned(SIGNAL_WIDTH-1 downto 0);  --Input signal as a ratio
+        ratio_i         :   in  signed(SIGNAL_WIDTH-1 downto 0);    --Input signal as a ratio
         valid_i         :   in  std_logic;                          --High for one cycle when ratio_i is valid
         
         cntrl_o         :   out t_control;                          --Output control signal
@@ -134,6 +134,9 @@ component NumberStabilisation is
 end component;
 
 component SaveADCData is
+    generic(
+        MEM_SIZE    :   natural                 --Options are 14, 13, and 12
+    );
     port(
         readClk     :   in  std_logic;          --Clock for reading data
         writeClk    :   in  std_logic;          --Clock for writing data
@@ -217,8 +220,8 @@ signal gainValid            :   std_logic                       :=  '0';
 -- Signal computation signals
 --
 signal useFixedGain         :   std_logic;
-signal fixedGains           :   t_param_reg                     :=  (others => '0');
-signal ratio                :   unsigned(SIGNAL_WIDTH-1 downto 0)   :=  (others => '0');
+signal fixedGains           :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
+signal ratio                :   signed(SIGNAL_WIDTH-1 downto 0) :=  (others => '0');
 signal ratioValid           :   std_logic                       :=  '0';
 
 --
@@ -236,8 +239,8 @@ signal pulseMWMan           :   std_logic;
 --
 -- Block memory signals
 --
-signal mem_bus_m    :   t_mem_bus_master_array(3 downto 0)      :=  (others => INIT_MEM_BUS_MASTER);
-signal mem_bus_s    :   t_mem_bus_slave_array(3 downto 0)       :=  (others => INIT_MEM_BUS_SLAVE);
+signal mem_bus_m    :   t_mem_bus_master_array(4 downto 0)      :=  (others => INIT_MEM_BUS_MASTER);
+signal mem_bus_s    :   t_mem_bus_slave_array(4 downto 0)       :=  (others => INIT_MEM_BUS_SLAVE);
 signal reset        :   std_logic   :=  '0';
 signal memIdx       :   natural range 0 to 255                  :=  0;
 
@@ -357,6 +360,23 @@ port map(
     
 );
 
+--
+-- Save ratio data
+--
+SaveRatioData: SaveADCData
+generic map(
+    MEM_SIZE    =>  13
+)
+port map(
+    readClk     =>  sysClk,
+    writeClk    =>  adcClk,
+    aresetn     =>  aresetn,
+    data_i      =>  std_logic_vector(ratio),
+    valid_i     =>  ratioValid,
+    bus_m       =>  mem_bus_m(4),
+    bus_s       =>  mem_bus_s(4)
+);
+
 
 --
 -- Routes signals to digital outputs
@@ -397,8 +417,8 @@ cntrlAux_i.enable <= sharedReg(0) and (not useFixedGain);
 fbControl_i.enable <= sharedReg(1);
 useFixedGain <= sharedReg(2);
 fbAuxReg <= (0 => sharedReg(3), others => '0');
-signalDefaultState <= not sharedReg(4);
-auxDefaultState <= not sharedReg(5);
+signalDefaultState <= sharedReg(4);
+auxDefaultState <= sharedReg(5);
 
 --
 -- Manual signals
@@ -418,6 +438,7 @@ mem_bus_m(0).reset <= reset or cntrlSignal_i.start;
 mem_bus_m(1).reset <= reset or cntrlSignal_i.start;
 mem_bus_m(2).reset <= reset or cntrlAux_i.start;
 mem_bus_m(3).reset <= reset or cntrlAux_i.start;
+mem_bus_m(4).reset <= reset or cntrlSignal_i.start;
 
 --
 -- Define useful signals for parsing AXI communications
@@ -447,6 +468,9 @@ begin
         mem_bus_m(3).addr <= (others => '0');
         mem_bus_m(3).trig <= '0';
         mem_bus_m(3).status <= idle;
+        mem_bus_m(4).addr <= (others => '0');
+        mem_bus_m(4).trig <= '0';
+        mem_bus_m(4).status <= idle;
         
     elsif rising_edge(sysClk) then
         FSM: case(comState) is
@@ -482,11 +506,12 @@ begin
                             when X"00001C" => rw(bus_m,bus_s,comState,integrateRegs(0));
                             when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(1));
                             when X"000024" => rw(bus_m,bus_s,comState,gainMultipliers);
-                            when X"000028" => rw(bus_m,bus_s,comState,fixedGains);
-                            when X"00002C" => rw(bus_m,bus_s,comState,fbComputeRegs(0));
-                            when X"000030" => rw(bus_m,bus_s,comState,fbComputeRegs(1));
-                            when X"000034" => rw(bus_m,bus_s,comState,fbPulseRegs(0));
-                            when X"000038" => rw(bus_m,bus_s,comState,fbPulseRegs(1));
+                            when X"000028" => rw(bus_m,bus_s,comState,fixedGains(0));
+                            when X"00002C" => rw(bus_m,bus_s,comState,fixedGains(1));
+                            when X"000030" => rw(bus_m,bus_s,comState,fbComputeRegs(0));
+                            when X"000034" => rw(bus_m,bus_s,comState,fbComputeRegs(1));
+                            when X"000038" => rw(bus_m,bus_s,comState,fbPulseRegs(0));
+                            when X"00003C" => rw(bus_m,bus_s,comState,fbPulseRegs(1));
                             
                             
                             when others => 
@@ -502,6 +527,7 @@ begin
                             when X"000004" => readOnly(bus_m,bus_s,comState,mem_bus_s(1).last);
                             when X"000008" => readOnly(bus_m,bus_s,comState,mem_bus_s(2).last);
                             when X"00000C" => readOnly(bus_m,bus_s,comState,mem_bus_s(3).last);
+                            when X"000010" => readOnly(bus_m,bus_s,comState,mem_bus_s(4).last);
                             when others => 
                                 comState <= finishing;
                                 bus_s.resp <= "11";
@@ -513,7 +539,7 @@ begin
                     -- X"04" => Raw data for auxiliary acquisition
                     -- X"05" => Integrated data for signal acquisition
                     -- 
-                    when X"02" | X"03" | X"04" | X"05" =>
+                    when X"02" | X"03" | X"04" | X"05" | X"06" =>
                         if bus_m.valid(1) = '0' then
                             bus_s.resp <= "11";
                             comState <= finishing;

@@ -7,6 +7,9 @@ use work.AXI_Bus_Package.all;
 
 
 entity SaveADCData is
+    generic(
+        MEM_SIZE    :   natural                 --Options are 14, 13, and 12
+    );
     port(
         readClk     :   in  std_logic;          --Clock for reading data
         writeClk    :   in  std_logic;          --Clock for writing data
@@ -34,14 +37,42 @@ COMPONENT BlockMemory32x14
   );
 END COMPONENT;
 
-signal trig         :   std_logic_vector(1 downto 0)    :=  "00";
-signal wea          :   std_logic_vector(0 downto 0)    :=  "0";
-signal addra        :   t_mem_addr :=  (others => '0');
+COMPONENT BlockMemory32x13
+  PORT (
+    clka : IN STD_LOGIC;
+    wea : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+    addra : IN STD_LOGIC_VECTOR(12 DOWNTO 0);
+    dina : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+    clkb : IN STD_LOGIC;
+    addrb : IN STD_LOGIC_VECTOR(12 DOWNTO 0);
+    doutb : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
+  );
+END COMPONENT;
 
-signal state        :   natural range 0 to 3    :=  0;
-signal dina         :   std_logic_vector(31 downto 0)   :=  (others => '0');
+COMPONENT BlockMemory32x12
+  PORT (
+    clka : IN STD_LOGIC;
+    wea : IN STD_LOGIC_VECTOR(0 DOWNTO 0);
+    addra : IN STD_LOGIC_VECTOR(11 DOWNTO 0);
+    dina : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+    clkb : IN STD_LOGIC;
+    addrb : IN STD_LOGIC_VECTOR(11 DOWNTO 0);
+    doutb : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
+  );
+END COMPONENT;
 
-signal resetSync    :   std_logic_vector(1 downto 0)    :=  "00";
+constant MAX_MEM_ADDR   :   t_mem_addr                      :=  (others => '1');
+
+signal maxAddr          :   t_mem_addr                      :=  (others => '1');
+
+signal trig             :   std_logic_vector(1 downto 0)    :=  "00";
+signal wea              :   std_logic_vector(0 downto 0)    :=  "0";
+signal addra            :   t_mem_addr                      :=  (others => '0');
+
+signal state            :   natural range 0 to 3            :=  0;
+signal dina             :   std_logic_vector(31 downto 0)   :=  (others => '0');
+
+signal resetSync        :   std_logic_vector(1 downto 0)    :=  "00";
 
 begin
 
@@ -63,16 +94,45 @@ end process;
 --
 -- Instantiate the block memory
 --
-BlockMem : BlockMemory32x14
-PORT MAP (
-    clka => writeClk,
-    wea => wea,
-    addra => std_logic_vector(addra),
-    dina => dina,
-    clkb => readClk,
-    addrb => std_logic_vector(bus_m.addr),
-    doutb => bus_s.data
-);
+maxAddr <= resize(MAX_MEM_ADDR(MEM_SIZE-1 downto 0),maxAddr'length);
+LargeMem: if MEM_SIZE = 14 generate
+    BlockMemLarge : BlockMemory32x14
+    PORT MAP (
+        clka => writeClk,
+        wea => wea,
+        addra => std_logic_vector(addra),
+        dina => dina,
+        clkb => readClk,
+        addrb => std_logic_vector(bus_m.addr),
+        doutb => bus_s.data
+    );
+end generate LargeMem;
+
+MediumMem: if MEM_SIZE = 13 generate    
+    BlockMemMedium : BlockMemory32x13
+    PORT MAP (
+        clka => writeClk,
+        wea => wea,
+        addra => std_logic_vector(addra(MEM_SIZE-1 downto 0)),
+        dina => dina,
+        clkb => readClk,
+        addrb => std_logic_vector(bus_m.addr(MEM_SIZE-1 downto 0)),
+        doutb => bus_s.data
+    );
+end generate MediumMem;
+
+SmallMem: if MEM_SIZE = 12 generate    
+    BlockMemSmall : BlockMemory32x12
+    PORT MAP (
+        clka => writeClk,
+        wea => wea,
+        addra => std_logic_vector(addra(MEM_SIZE-1 downto 0)),
+        dina => dina,
+        clkb => readClk,
+        addrb => std_logic_vector(bus_m.addr(MEM_SIZE-1 downto 0)),
+        doutb => bus_s.data
+    );
+end generate SmallMem;
 
 --
 -- Write ADC data to memory
@@ -89,7 +149,7 @@ begin
     elsif rising_edge(writeClk) then
         if resetSync = "01" then
             addra <= (others => '0');
-        elsif valid_i = '1' and addra < (addra'range => '1') then
+        elsif valid_i = '1' and addra < maxAddr then
             addra <= addra + 1;
             bus_s.last <= addra + 1;
         end if;

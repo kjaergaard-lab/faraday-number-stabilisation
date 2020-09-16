@@ -108,6 +108,9 @@ component IntegrateADCData is
 end component;
 
 component SaveADCData is
+    generic(
+        MEM_SIZE    :   natural                 --Options are 14, 13, and 12
+    );
     port(
         readClk     :   in  std_logic;          --Clock for reading data
         writeClk    :   in  std_logic;          --Clock for writing data
@@ -239,6 +242,9 @@ valid_o <= validInt;
 data_o <= dataInt;
 
 SaveAvgData: SaveADCData
+generic map(
+    MEM_SIZE    =>  12
+)
 port map(
     readClk     =>  sysClk,
     writeClk    =>  adcClk,
@@ -250,6 +256,9 @@ port map(
 );
 
 SaveIntegratedData: SaveADCData
+generic map(
+    MEM_SIZE    =>  14
+)
 port map(
     readClk     =>  sysClk,
     writeClk    =>  adcClk,

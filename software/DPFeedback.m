@@ -3,6 +3,7 @@ classdef DPFeedback < handle
         signal
         aux
         
+        gains
         sum
         diff
         ratio
@@ -63,7 +64,7 @@ classdef DPFeedback < handle
         avgReg
         integrateRegs
         gainComputeReg
-        signalComputeReg
+        signalComputeRegs
         fbComputeRegs
         fbPulseRegs
         
@@ -101,17 +102,19 @@ classdef DPFeedback < handle
             self.integrateRegs = DPFeedbackRegister('1C',self.conn);
             self.integrateRegs(2) = DPFeedbackRegister('20',self.conn);
             self.gainComputeReg = DPFeedbackRegister('24',self.conn);
-            self.signalComputeReg = DPFeedbackRegister('28',self.conn);
-            self.fbComputeRegs = DPFeedbackRegister('2C',self.conn);
-            self.fbComputeRegs(2) = DPFeedbackRegister('30',self.conn);
-            self.fbPulseRegs = DPFeedbackRegister('34',self.conn);
-            self.fbPulseRegs(2) = DPFeedbackRegister('38',self.conn);
+            self.signalComputeRegs = DPFeedbackRegister('28',self.conn);
+            self.signalComputeRegs(2) = DPFeedbackRegister('2C',self.conn);
+            self.fbComputeRegs = DPFeedbackRegister('30',self.conn);
+            self.fbComputeRegs(2) = DPFeedbackRegister('34',self.conn);
+            self.fbPulseRegs = DPFeedbackRegister('38',self.conn);
+            self.fbPulseRegs(2) = DPFeedbackRegister('3C',self.conn);
             
             % Read-only registers
             self.sampleRegs = DPFeedbackRegister('01000000',self.conn);
             self.pulsesRegs = DPFeedbackRegister('01000004',self.conn);
             self.sampleRegs(2) = DPFeedbackRegister('01000008',self.conn);
             self.pulsesRegs(2) = DPFeedbackRegister('0100000C',self.conn);
+            self.pulsesRegs(3) = DPFeedbackRegister('01000010',self.conn);
             
             %Shared registers
             self.enableDP = DPFeedbackParameter([0,0],self.sharedReg)...
@@ -182,22 +185,22 @@ classdef DPFeedback < handle
             self.auxMultipliers(2) = DPFeedbackParameter([8,15],self.gainComputeReg)...
                 .setLimits('lower',1,'upper',255)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
-            self.presetGains = DPFeedbackParameter([0,15],self.signalComputeReg)...
-                .setLimits('lower',1,'upper',2^16-1)...
+            self.presetGains = DPFeedbackParameter([0,31],self.signalComputeRegs(1))...
+                .setLimits('lower',1,'upper',2^32-1)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
-            self.presetGains(2) = DPFeedbackParameter([16,31],self.signalComputeReg)...
-                .setLimits('lower',1,'upper',2^16-1)...
+            self.presetGains(2) = DPFeedbackParameter([0,31],self.signalComputeRegs(2))...
+                .setLimits('lower',1,'upper',2^32-1)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
             
             %Feedback registers
             self.maxMWPulses = DPFeedbackParameter([0,15],self.fbComputeRegs(1))...
                 .setLimits('lower',0,'upper',2^16-1);
-            self.target = DPFeedbackParameter([16,31;0,7],[self.fbComputeRegs(1),self.fbComputeRegs(2)])...
-                .setLimits('lower',0,'upper',2^24-1)...
-                .setFunctions('to',@(x) x*2^16,'from',@(x) x*2^(-16));
-            self.tol = DPFeedbackParameter([8,31],self.fbComputeRegs(2))...
+            self.target = DPFeedbackParameter([16,31],self.fbComputeRegs(1))...
                 .setLimits('lower',0,'upper',1)...
-                .setFunctions('to',@(x) (1+x)*self.target.get*2^16,'from',@(x) x/(2^16*self.target.get)-1);
+                .setFunctions('to',@(x) x*(2^16-1),'from',@(x) x/(2^16-1));
+            self.tol = DPFeedbackParameter([0,15],self.fbComputeRegs(2))...
+                .setLimits('lower',0,'upper',1)...
+                .setFunctions('to',@(x) (1+x)*self.target.get*(2^16-1),'from',@(x) x/((2^16-1)*self.target.get)-1);
             
             self.mwNumPulses = DPFeedbackParameter([16,31],self.fbPulseRegs(1))...
                 .setLimits('lower',0,'upper',2^16-1);
@@ -221,6 +224,9 @@ classdef DPFeedback < handle
             self.pulsesCollected(2) = DPFeedbackParameter([0,14],self.pulsesRegs(2))...
                 .setLimits('lower',0,'upper',2^14)...
                 .setFunctions('to',@(x) x,'from',@(x) round(x/2));
+            self.pulsesCollected(3) = DPFeedbackParameter([0,14],self.pulsesRegs(3))...
+                .setLimits('lower',0,'upper',2^14)...
+                .setFunctions('to',@(x) x,'from',@(x) x);
             
             % Manual settings
             self.manualFlag = DPFeedbackParameter([31,31],self.sharedReg)...
@@ -267,7 +273,7 @@ classdef DPFeedback < handle
             self.presetGains(2).set(1);
             
             self.maxMWPulses.set(1e4*0.5);
-            self.target.set(1);
+            self.target.set(.1);
             self.tol.set(0.05);
             
             self.mwNumPulses.set(1e3);
@@ -299,7 +305,7 @@ classdef DPFeedback < handle
                 error('Start of summation interval is after subtraction interval');
             elseif self.sumStart.get+self.sumWidth.get >= self.subStart.get
                 error('Summation interval overlaps with subtraction interval');
-            elseif self.subStart.get >= self.samplesPerPulse.get || self.subStart.get+self.sumWidth.get >= self.samplesPerPulse.get
+            elseif ~self.usePresetOffsets.value && (self.subStart.get >= self.samplesPerPulse.get || self.subStart.get+self.sumWidth.get >= self.samplesPerPulse.get)
                 error('Subtraction interval is outside of number sample collection range')
             end
             
@@ -318,7 +324,7 @@ classdef DPFeedback < handle
             self.avgReg.write;
             self.integrateRegs.write;
             self.gainComputeReg.write;
-            self.signalComputeReg.write;
+            self.signalComputeRegs.write;
             self.fbComputeRegs.write;
             self.fbPulseRegs.write;
         end
@@ -330,7 +336,7 @@ classdef DPFeedback < handle
             self.avgReg.read;
             self.integrateRegs.read;
             self.gainComputeReg.read;
-            self.signalComputeReg.read;
+            self.signalComputeRegs.read;
             self.fbComputeRegs.read;
             self.fbPulseRegs.read;
             
@@ -376,10 +382,8 @@ classdef DPFeedback < handle
             self.mwPulsePeriod.get;
             
             %Get number of collected samples
-            for nn=1:numel(self.samplesCollected)
-                self.samplesCollected(nn).read;
-                self.pulsesCollected(nn).read;
-            end
+            self.samplesCollected.read;
+            self.pulsesCollected.read;
             
             %Manual signals
             self.manualFlag.get;
@@ -462,40 +466,56 @@ classdef DPFeedback < handle
             end
         end
         
-        function self = calcRatio(self)
+        function self = calcRatio(self,method)
+            if nargin == 1
+                method = 'float';
+            elseif ~strcmpi(method,'int') && ~strcmpi(method,'float')
+                error('Method can only be ''int'' or ''float''');
+            end
             if self.useFixedGain.value
-                gains = repmat([self.presetGains.value],numel(self.signal.t),1);
+                self.gains = fix(repmat([self.presetGains.value],numel(self.signal.t),1));
             else
-                gains = zeros(size(self.aux.data));
-                for nn=1:size(self.aux.data,1)
-                    gains(nn,:) = self.aux.data(nn,:).*[self.auxMultipliers.value];
-                end
+                if strcmpi(method,'int')
+                    self.gains = fix(self.aux.data.*self.sumWidth.value).*fix(repmat([self.auxMultipliers.value],size(self.aux.data,1),1));
+                    self.gains = fix(self.gains);
+                elseif strcmpi(method,'float')
+                    self.gains = self.aux.data.*self.sumWidth.value.*repmat([self.auxMultipliers.value],size(self.aux.data,1),1);
+                    self.gains = self.gains;
+                end 
             end
             
-            sx = gains(:,2).*self.signal.data(:,1);
-            sy = gains(:,1).*self.signal.data(:,2);
-            self.sum = sx+sy;
-            self.diff = sx-sy;
-            self.ratio = self.diff./self.sum;
+            if strcmpi(method,'int')
+                sx = self.gains(:,2).*fix(self.signal.data(:,1)*self.sumWidth.value);
+                sy = self.gains(:,1).*fix(self.signal.data(:,2)*self.sumWidth.value);
+                self.sum = sx+sy;
+                self.diff = sx-sy;                
+                self.ratio = self.diff./self.sum;
+            elseif strcmpi(method,'float')
+                sx = self.gains(:,2).*self.signal.data(:,1);
+                sy = self.gains(:,1).*self.signal.data(:,2);
+                self.sum = sx+sy;
+                self.diff = sx-sy;
+                self.ratio = self.diff./self.sum;
+            end
             self.t = self.signal.t;
         end
         
-%         function self = getRatio(self)
-%             self.pulsesCollected.read;
-%             self.conn.write(0,'mode','fetch data','fetch type',4,'numFetch',self.pulsesCollected(1).value);
-%             rawData = typecast(self.conn.recvMessage,'uint8');
-% 
-%             data = zeros(self.pulsesCollected(1).value,1);
-% 
-%             mm = 1;
-%             for nn=1:4:numel(rawData)
-%                 data(mm,1) = double(typecast(uint8(rawData(nn+(0:3))),'int32'));
-%                 mm = mm+1;
-%             end
-%             
-%             self.ratio = data/2^16;
-%             self.tPulse = self.period.value*(0:(self.pulsesCollected(qq).value-1))';
-%         end
+        function self = getRatio(self)
+            self.pulsesCollected(3).read;
+            self.conn.write(0,'mode','fetch data','fetchType',4,'numFetch',self.pulsesCollected(3).value);
+            rawData = typecast(self.conn.recvMessage,'uint8');
+
+            data = zeros(self.pulsesCollected(3).value,1);
+
+            mm = 1;
+            for nn=1:4:numel(rawData)
+                data(mm,1) = double(typecast(uint8(rawData(nn+(0:1))),'int16'));
+                mm = mm+1;
+            end
+            
+            self.ratio = data/2^15;
+            self.t = self.period.value*(0:(self.pulsesCollected(3).value-1))';
+        end
         
 %         function v = integrate(self)
 %             sumidx = (self.sumStart.get):(self.sumStart.get+self.sumWidth.get);
@@ -505,13 +525,15 @@ classdef DPFeedback < handle
 %         end
         
         function disp(self)
-            strwidth = 28;
+            strwidth = 36;
             fprintf(1,'DPFeedback object with properties:\n');
             fprintf(1,'\t Registers\n');
             self.sharedReg.makeString('sharedReg',strwidth);
             self.pulseRegs.makeString('pulseRegs',strwidth);
             self.avgReg.makeString('avgReg',strwidth);
             self.integrateRegs.makeString('integrateRegs',strwidth);
+            self.gainComputeReg.makeString('gainComputeReg',strwidth);
+            self.signalComputeRegs.makeString('signalComputeRegs',strwidth);
             self.fbComputeRegs.makeString('fbComputeRegs',strwidth);
             self.fbPulseRegs.makeString('fbPulseRegs',strwidth);
             self.sampleRegs.makeString('sampleRegs',strwidth);
@@ -550,6 +572,7 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t  Number of signal pulses collected: %d\n',self.pulsesCollected(1).value);
             fprintf(1,'\t\t    Number of aux samples collected: %d\n',self.samplesCollected(2).value);
             fprintf(1,'\t\t     Number of aux pulses collected: %d\n',self.pulsesCollected(2).value);
+            fprintf(1,'\t\t         Number of ratios collected: %d\n',self.pulsesCollected(3).value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Feedback Parameters\n');
             fprintf(1,'\t\t             Max # MW pulses: %d\n',self.maxMWPulses.value);

@@ -154,15 +154,27 @@ classdef DPFeedbackParameter < handle
         end
         
         function self = read(self)
-            for nn=1:numel(self.regs)
-                self.regs(nn).read;
+            if numel(self) == 1
+                for nn=1:numel(self.regs)
+                    self.regs(nn).read;
+                end
+                self.get;
+            else
+                for nn=1:numel(self)
+                    self(nn).read;
+                end
             end
-            self.get;
         end
         
         function self = write(self)
-            for nn=1:numel(self.regs)
-                self.regs(nn).write;
+            if numel(self) == 1
+                for nn=1:numel(self.regs)
+                    self.regs(nn).write;
+                end
+            else
+                for nn=1:numel(self)
+                    self(nn).write;
+                end
             end
         end
         

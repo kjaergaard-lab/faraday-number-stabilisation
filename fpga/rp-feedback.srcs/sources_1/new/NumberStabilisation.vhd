@@ -25,7 +25,7 @@ entity NumberStabilisation is
         pulseRegs_i     :   in  t_param_reg_array(1 downto 0);
         auxReg          :   in  t_param_reg;                        --Auxiliary register (X (31), enable software triggers (1))
         
-        ratio_i         :   in  unsigned(SIGNAL_WIDTH-1 downto 0);  --Input signal as a ratio
+        ratio_i         :   in  signed(SIGNAL_WIDTH-1 downto 0);    --Input signal as a ratio
         valid_i         :   in  std_logic;                          --High for one cycle when ratio_i is valid
         
         cntrl_o         :   out t_control;                          --Output control signal
@@ -40,12 +40,12 @@ COMPONENT NumPulses_Divider
     aclk : IN STD_LOGIC;
     s_axis_divisor_tvalid : IN STD_LOGIC;
     s_axis_divisor_tready : OUT STD_LOGIC;
-    s_axis_divisor_tdata : IN STD_LOGIC_VECTOR(23 DOWNTO 0);
+    s_axis_divisor_tdata : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
     s_axis_dividend_tvalid : IN STD_LOGIC;
     s_axis_dividend_tready : OUT STD_LOGIC;
-    s_axis_dividend_tdata : IN STD_LOGIC_VECTOR(23 DOWNTO 0);
+    s_axis_dividend_tdata : IN STD_LOGIC_VECTOR(15 DOWNTO 0);
     m_axis_dout_tvalid : OUT STD_LOGIC;
-    m_axis_dout_tdata : OUT STD_LOGIC_VECTOR(39 DOWNTO 0)
+    m_axis_dout_tdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
   );
 END COMPONENT;
 
@@ -77,7 +77,7 @@ component PulseGen is
     );
 end component;   
 
-constant DIVIDE_LATENCY :   natural :=  50;
+constant DIVIDE_LATENCY :   natural :=  40;
 constant MULT_LATENCY   :   natural :=  4;
 constant MAX_NUM_PULSES :   natural :=  65535;
 
@@ -112,7 +112,8 @@ signal target           :   unsigned(SIGNAL_WIDTH-1 downto 0)                   
 signal tol              :   unsigned(SIGNAL_WIDTH-1 downto 0)                   :=  (others => '0');
 signal diff             :   unsigned(SIGNAL_WIDTH-1 downto 0)                   :=  (others => '0');
 
-signal div_o            :   std_logic_vector(39 downto 0)                       :=  (others => '0');
+signal ratio_abs        :   unsigned(SIGNAL_WIDTH-1 downto 0)                   :=  (others => '0');
+signal div_o            :   std_logic_vector(31 downto 0)                       :=  (others => '0');
 signal divValid         :   std_logic;
 
 
@@ -120,16 +121,18 @@ begin
 
 
 numPulsesMax <= resize(unsigned(computeRegs(0)(15 downto 0)),numPulsesMax'length);
-target <= unsigned(computeRegs(1)(7 downto 0)) & unsigned(computeRegs(0)(31 downto 16));
-tol <= unsigned(computeRegs(1)(31 downto 8));
+target <= unsigned(computeRegs(0)(31 downto 16));
+tol <= unsigned(computeRegs(1)(15 downto 0));
 --target <= unsigned(computeRegs(1)) & unsigned(computeRegs(0)(31 downto 16));
 --tol <= unsigned(computeRegs(3)(15 downto 0)) & unsigned(computeRegs(2));
+
+ratio_abs <= unsigned(abs(shift_left(ratio_i,1)));
 
 PulseNumberDivision : NumPulses_Divider
 PORT MAP (
     aclk                    => clk,
     s_axis_divisor_tvalid   => valid_i,
-    s_axis_divisor_tdata    => std_logic_vector(ratio_i),
+    s_axis_divisor_tdata    => std_logic_vector(ratio_abs),
     s_axis_dividend_tvalid  => valid_i,
     s_axis_dividend_tdata   => std_logic_vector(diff),
     m_axis_dout_tvalid      => divValid,
@@ -214,8 +217,8 @@ begin
             when idle =>
                 pulseTrig <= '0';
                 if valid_i = '1' and cntrl_i.enable = '1' then
-                    if ratio_i > tol and ratio_i > target then
-                        diff <= ratio_i - target;
+                    if ratio_abs > tol and ratio_abs > target then
+                        diff <= ratio_abs - target;
                         state <= dividing;
                         count <= 0;
                     else
