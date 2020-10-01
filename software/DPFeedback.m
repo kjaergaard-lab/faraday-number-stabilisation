@@ -26,7 +26,8 @@ classdef DPFeedback < handle
         shutterDelay
         auxDelay
         
-        delay
+        delaySignal
+        delayAux
         samplesPerPulse
         log2Avgs
         
@@ -61,7 +62,7 @@ classdef DPFeedback < handle
         trigReg
         sharedReg
         pulseRegs
-        avgReg
+        avgRegs
         integrateRegs
         gainComputeReg
         signalComputeRegs
@@ -98,16 +99,17 @@ classdef DPFeedback < handle
             self.pulseRegs(2) = DPFeedbackRegister('C',self.conn);
             self.pulseRegs(3) = DPFeedbackRegister('10',self.conn);
             self.pulseRegs(4) = DPFeedbackRegister('14',self.conn);
-            self.avgReg = DPFeedbackRegister('18',self.conn);
-            self.integrateRegs = DPFeedbackRegister('1C',self.conn);
-            self.integrateRegs(2) = DPFeedbackRegister('20',self.conn);
-            self.gainComputeReg = DPFeedbackRegister('24',self.conn);
-            self.signalComputeRegs = DPFeedbackRegister('28',self.conn);
-            self.signalComputeRegs(2) = DPFeedbackRegister('2C',self.conn);
-            self.fbComputeRegs = DPFeedbackRegister('30',self.conn);
-            self.fbComputeRegs(2) = DPFeedbackRegister('34',self.conn);
-            self.fbPulseRegs = DPFeedbackRegister('38',self.conn);
-            self.fbPulseRegs(2) = DPFeedbackRegister('3C',self.conn);
+            self.avgRegs = DPFeedbackRegister('18',self.conn);
+            self.avgRegs(2) = DPFeedbackRegister('1C',self.conn);
+            self.integrateRegs = DPFeedbackRegister('20',self.conn);
+            self.integrateRegs(2) = DPFeedbackRegister('24',self.conn);
+            self.gainComputeReg = DPFeedbackRegister('28',self.conn);
+            self.signalComputeRegs = DPFeedbackRegister('2C',self.conn);
+            self.signalComputeRegs(2) = DPFeedbackRegister('30',self.conn);
+            self.fbComputeRegs = DPFeedbackRegister('34',self.conn);
+            self.fbComputeRegs(2) = DPFeedbackRegister('38',self.conn);
+            self.fbPulseRegs = DPFeedbackRegister('3C',self.conn);
+            self.fbPulseRegs(2) = DPFeedbackRegister('40',self.conn);
             
             % Read-only registers
             self.sampleRegs = DPFeedbackRegister('01000000',self.conn);
@@ -148,13 +150,16 @@ classdef DPFeedback < handle
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
             
             %Initial processing
-            self.delay = DPFeedbackParameter([0,13],self.avgReg)...
+            self.delaySignal = DPFeedbackParameter([0,13],self.avgRegs(1))...
                 .setLimits('lower',0,'upper',1e-6)...
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
-            self.samplesPerPulse = DPFeedbackParameter([14,27],self.avgReg)...
+            self.delayAux = DPFeedbackParameter([0,13],self.avgRegs(2))...
+                .setLimits('lower',0,'upper',1e-6)...
+                .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
+            self.samplesPerPulse = DPFeedbackParameter([14,27],self.avgRegs(1))...
                 .setLimits('lower',0,'upper',2^14-1)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
-            self.log2Avgs = DPFeedbackParameter([28,31],self.avgReg)...
+            self.log2Avgs = DPFeedbackParameter([28,31],self.avgRegs(1))...
                 .setLimits('lower',0,'upper',2^4-1)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
             
@@ -170,10 +175,10 @@ classdef DPFeedback < handle
                 .setFunctions('to',@(x) x,'from',@(x) x);
             self.offsets = DPFeedbackParameter([0,13],self.integrateRegs(2))...
                 .setLimits('lower',-2^13,'upper',2^13)...
-                .setFunctions('to',@(x) x,'from',@(x) x);
+                .setFunctions('to',@(x) typecast(int32(round(x)),'uint32'),'from',@(x) double(typecast(x,'int32')));
             self.offsets(2) = DPFeedbackParameter([27,14],self.integrateRegs(2))...
                 .setLimits('lower',-2^13,'upper',2^13)...
-                .setFunctions('to',@(x) x,'from',@(x) x);
+                .setFunctions('to',@(x) typecast(int32(round(x)),'uint32'),'from',@(x) double(typecast(x,'int32')));
             self.usePresetOffsets = DPFeedbackParameter([28,28],self.integrateRegs(2))...
                 .setLimits('lower',0,'upper',1)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
@@ -256,7 +261,8 @@ classdef DPFeedback < handle
             self.shutterDelay.set(2.5e-3);
             self.auxDelay.set(2.5e-3);
             
-            self.delay.set(0);
+            self.delaySignal.set(0);
+            self.delayAux.set(0);
             self.samplesPerPulse.set(250);
             self.log2Avgs.set(0);
             
@@ -321,7 +327,7 @@ classdef DPFeedback < handle
             self.check;
             self.sharedReg.write;
             self.pulseRegs.write;
-            self.avgReg.write;
+            self.avgRegs.write;
             self.integrateRegs.write;
             self.gainComputeReg.write;
             self.signalComputeRegs.write;
@@ -333,7 +339,7 @@ classdef DPFeedback < handle
             %Read registers
             self.sharedReg.read;
             self.pulseRegs.read;
-            self.avgReg.read;
+            self.avgRegs.read;
             self.integrateRegs.read;
             self.gainComputeReg.read;
             self.signalComputeRegs.read;
@@ -354,7 +360,8 @@ classdef DPFeedback < handle
             self.shutterDelay.get;
             self.auxDelay.get;
             
-            self.delay.get;
+            self.delaySignal.get;
+            self.delayAux.get;
             self.samplesPerPulse.get;
             self.log2Avgs.get;
             

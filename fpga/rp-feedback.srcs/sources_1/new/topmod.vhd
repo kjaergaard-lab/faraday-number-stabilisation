@@ -169,7 +169,9 @@ signal sharedReg            :   t_param_reg                     :=  (others => '
 signal pulseRegs            :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
 signal pulseRegsSignal      :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
 signal pulseRegsAux         :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
-signal avgReg               :   t_param_reg                     :=  (others => '0');
+signal avgRegSignal         :   t_param_reg                     :=  (others => '0');
+signal avgRegAux            :   t_param_reg                     :=  (others => '0');
+signal avgRegs              :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
 signal integrateRegs        :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
 
 --
@@ -259,7 +261,7 @@ port map(
     adcData_i       =>  adcData_i,
 
     pulseRegs       =>  pulseRegsSignal,
-    avgReg          =>  avgReg,
+    avgReg          =>  avgRegSignal,
     integrateRegs   =>  integrateRegs,
 
     bus_m           =>  mem_bus_m(1 downto 0),
@@ -287,7 +289,7 @@ port map(
     adcData_i       =>  adcData_i,
 
     pulseRegs       =>  pulseRegsAux,
-    avgReg          =>  avgReg,
+    avgReg          =>  avgRegAux,
     integrateRegs   =>  integrateRegs,
 
     bus_m           =>  mem_bus_m(3 downto 2),
@@ -401,6 +403,8 @@ resp_o <= bus_s.resp;
 --
 pulseRegsSignal(1 downto 0) <= pulseRegs(1 downto 0);
 pulseRegsAux(1 downto 0) <= pulseRegs(1 downto 0);
+avgRegSignal <= avgRegs(0);
+avgRegAux <= avgRegs(0)(avgRegAux'length-1 downto 14) & avgRegs(1)(13 downto 0);
 
 --
 -- Shared registers
@@ -502,16 +506,17 @@ begin
                             when X"00000C" => rw(bus_m,bus_s,comState,pulseRegs(1));
                             when X"000010" => rw(bus_m,bus_s,comState,pulseRegsSignal(2));
                             when X"000014" => rw(bus_m,bus_s,comState,pulseRegsAux(2));
-                            when X"000018" => rw(bus_m,bus_s,comState,avgReg);
-                            when X"00001C" => rw(bus_m,bus_s,comState,integrateRegs(0));
-                            when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(1));
-                            when X"000024" => rw(bus_m,bus_s,comState,gainMultipliers);
-                            when X"000028" => rw(bus_m,bus_s,comState,fixedGains(0));
-                            when X"00002C" => rw(bus_m,bus_s,comState,fixedGains(1));
-                            when X"000030" => rw(bus_m,bus_s,comState,fbComputeRegs(0));
-                            when X"000034" => rw(bus_m,bus_s,comState,fbComputeRegs(1));
-                            when X"000038" => rw(bus_m,bus_s,comState,fbPulseRegs(0));
-                            when X"00003C" => rw(bus_m,bus_s,comState,fbPulseRegs(1));
+                            when X"000018" => rw(bus_m,bus_s,comState,avgRegs(0));
+                            when X"00001C" => rw(bus_m,bus_s,comState,avgRegs(1));
+                            when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(0));
+                            when X"000024" => rw(bus_m,bus_s,comState,integrateRegs(1));
+                            when X"000028" => rw(bus_m,bus_s,comState,gainMultipliers);
+                            when X"00002C" => rw(bus_m,bus_s,comState,fixedGains(0));
+                            when X"000030" => rw(bus_m,bus_s,comState,fixedGains(1));
+                            when X"000034" => rw(bus_m,bus_s,comState,fbComputeRegs(0));
+                            when X"000038" => rw(bus_m,bus_s,comState,fbComputeRegs(1));
+                            when X"00003C" => rw(bus_m,bus_s,comState,fbPulseRegs(0));
+                            when X"000040" => rw(bus_m,bus_s,comState,fbPulseRegs(1));
                             
                             
                             when others => 
