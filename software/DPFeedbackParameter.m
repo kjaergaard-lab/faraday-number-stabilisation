@@ -116,7 +116,7 @@ classdef DPFeedbackParameter < handle
             %to an integer as well
             self.checkLimits(v);
             tmp = self.toInteger(v,varargin{:});
-            if log2(tmp) > self.numbits
+            if log2(double(tmp)) > self.numbits
                 error('Value will not fit in bit range with %d bits',self.numbits);
             end
             self.value = v;

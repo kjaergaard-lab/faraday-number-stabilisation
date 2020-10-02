@@ -151,10 +151,10 @@ classdef DPFeedback < handle
             
             %Initial processing
             self.delaySignal = DPFeedbackParameter([0,13],self.avgRegs(1))...
-                .setLimits('lower',0,'upper',1e-6)...
+                .setLimits('lower',0,'upper',100e-6)...
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
             self.delayAux = DPFeedbackParameter([0,13],self.avgRegs(2))...
-                .setLimits('lower',0,'upper',1e-6)...
+                .setLimits('lower',0,'upper',100e-6)...
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
             self.samplesPerPulse = DPFeedbackParameter([14,27],self.avgRegs(1))...
                 .setLimits('lower',0,'upper',2^14-1)...
@@ -261,8 +261,8 @@ classdef DPFeedback < handle
             self.shutterDelay.set(2.5e-3);
             self.auxDelay.set(2.5e-3);
             
-            self.delaySignal.set(0);
-            self.delayAux.set(0);
+            self.delaySignal.set(500e-9);
+            self.delayAux.set(1.75e-6);
             self.samplesPerPulse.set(250);
             self.log2Avgs.set(0);
             
@@ -286,8 +286,11 @@ classdef DPFeedback < handle
             self.mwPulseWidth.set(2e-6);
             self.mwPulsePeriod.set(50e-6);
             
-            % self.samplesCollected.set(0);
-            % self.pulsesCollected.set(0);
+            self.samplesCollected(1).set(0);
+            self.samplesCollected(2).set(0);
+            self.pulsesCollected(1).set(0);
+            self.pulsesCollected(2).set(0);
+            self.pulsesCollected(3).set(0);
             
             self.manualFlag.set(0);
             self.pulseDPMan.set(0);
@@ -537,7 +540,7 @@ classdef DPFeedback < handle
             fprintf(1,'\t Registers\n');
             self.sharedReg.makeString('sharedReg',strwidth);
             self.pulseRegs.makeString('pulseRegs',strwidth);
-            self.avgReg.makeString('avgReg',strwidth);
+            self.avgRegs.makeString('avgReg',strwidth);
             self.integrateRegs.makeString('integrateRegs',strwidth);
             self.gainComputeReg.makeString('gainComputeReg',strwidth);
             self.signalComputeRegs.makeString('signalComputeRegs',strwidth);
@@ -562,7 +565,8 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t  Number of pulses: %d\n',self.numpulses.value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Averaging Parameters\n');
-            fprintf(1,'\t\t              Delay: %.2e s\n',self.delay.value);
+            fprintf(1,'\t\t       Signal Delay: %.2e s\n',self.delaySignal.value);
+            fprintf(1,'\t\t          Aux Delay: %.2e s\n',self.delayAux.value);
             fprintf(1,'\t\t  Samples per pulse: %d\n',self.samplesPerPulse.value);
             fprintf(1,'\t\t    log2(# of avgs): %d\n',self.log2Avgs.value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
