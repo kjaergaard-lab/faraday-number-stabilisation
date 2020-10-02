@@ -27,35 +27,49 @@ end topmod;
 
 architecture Behavioural of topmod is
 
-component UART_Transmitter is
-	generic(BAUD_PERIOD	:	natural;									--Baud period
-	        NUM_BITS    :   natural);
-	
-	port(	clk 		: 	in 	std_logic;								--Clock signal
-			dataIn		:	in	std_logic_vector(NUM_BITS-1 downto 0);	--32-bit word to be sent
-			trigIn		:	in	std_logic;								--Trigger to send data
-			TxD			:	out	std_logic;								--Serial transmit port
-			baudTickOut	:	out	std_logic;								--Output for baud ticks for testing
-			busy		:	out	std_logic);								--Busy signal is high when transmitting
-end component;
-
-component PowerMeasurement is
+component DualChannelAcquisition is
+    generic(
+        USE_EXT_PULSE   :   boolean
+    );
     port(
-        sysClk          :   in  std_logic;
-        adcClk          :   in  std_logic;
-        aresetn         :   in  std_logic;
-        
-        cntrl_i         :   in  t_control;
-        adcData_i       :   in  t_adc_combined;
+        --
+        -- Clocking and reset
+        --
+        sysClk          :   in  std_logic;                          --Clock for pulses and reading data from memory
+        adcClk          :   in  std_logic;                          --Clock for ADCs and writing data to memory
+        aresetn         :   in  std_logic;                          --Asynchronous reset
 
-        avgReg0         :   in  t_param_reg;
-        integrateReg0   :   in  t_param_reg;
-
-        bus_m           :   in  t_mem_bus_master_array(1 downto 0);
-        bus_s           :   out t_mem_bus_slave_array(1 downto 0);
+        --
+        -- Input signals
+        --
+        cntrl_i         :   in  t_control;                          --Control signal for pulses
+        adcData_i       :   in  t_adc_combined;                     --Combined ADC data
         
-        power_o         :   out std_logic_vector(23 downto 0);
-        valid_o         :   out std_logic
+        --
+        -- Parameter registers
+        --
+        pulseRegs       :   in  t_param_reg_array(2 downto 0);      --Registers for controlling pulses
+        avgReg          :   in  t_param_reg;                        --Register for controlling quick averaging/downsampling
+        integrateRegs   :   in  t_param_reg_array(1 downto 0);      --Registers for controlling integration
+
+        --
+        -- Memory signals
+        --
+        bus_m           :   in  t_mem_bus_master_array(1 downto 0); --Master memory bus signals
+        bus_s           :   out t_mem_bus_slave_array(1 downto 0);  --Slave memory bus signals
+
+        --
+        -- Output data
+        --
+        data_o          :   out t_adc_integrated_array(1 downto 0); --Integrated output data for both ADCs
+        valid_o         :   out std_logic;                          --Output signal high for one adcClk cycle when data_o is valid
+
+        --
+        -- Output signals
+        --
+        pulse_o         :   out std_logic;                          --Output pulse signal
+        shutter_o       :   out std_logic;                          --Output shutter signal
+        status_o        :   out t_module_status                     --Output module status
     );
 end component;
 
@@ -68,73 +82,116 @@ signal bus_m        :   t_axi_bus_master    :=  INIT_AXI_BUS_MASTER;
 signal bus_s        :   t_axi_bus_slave     :=  INIT_AXI_BUS_SLAVE;
 
 --
--- UART signals
---
-constant BAUD_PERIOD:   natural             :=  12;
-constant SERIAL_BITS:   natural             :=  24;
-signal uart_i       :   std_logic_vector(SERIAL_BITS-1 downto 0)    :=  (others => '0');
-signal TxD          :   std_logic           :=  '0';
-
-
---
 -- Shared registers
 --
 signal triggers         :   t_param_reg :=  (others => '0');
-signal sharedReg0       :   t_param_reg :=  (others => '0');
+signal sharedReg        :   t_param_reg :=  (others => '0');
 
 --
--- Dispersive signals
+-- Acquisition registers
 --
-signal powerCntrl :   t_control   :=  INIT_CONTROL_ENABLED;
-signal avgReg0, integrateReg0 :   t_param_reg :=  (others => '0');
-signal power                :   std_logic_vector(23 downto 0);
-signal powerValid           :   std_logic;
+signal pulseRegs        :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
+signal avgRegs          :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
+signal avgRegSignal     :   t_param_reg                     :=  (others => '0');
+signal avgRegAux        :   t_param_reg                     :=  (others => '0');
+signal integrateRegs    :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
+
+--
+-- Power acquisition signals
+--
+signal signalCntrl       :   t_control                               :=  INIT_CONTROL_ENABLED;
+signal auxCntrl          :   t_control                               :=  INIT_CONTROL_ENABLED;
+
 
 --
 -- Block memory signals
 --
-signal mem_bus_m    :   t_mem_bus_master_array(1 downto 0)    :=  (others => INIT_MEM_BUS_MASTER);
-signal mem_bus_s    :   t_mem_bus_slave_array(1 downto 0)     :=  (others => INIT_MEM_BUS_SLAVE);
-signal reset        :   std_logic   := '0';
-signal autoReset        :   std_logic   :=  '0';
-signal autoResetCount   :   unsigned(31 downto 0)   :=  (others => '0');
+signal mem_bus_m            :   t_mem_bus_master_array(3 downto 0)      :=  (others => INIT_MEM_BUS_MASTER);
+signal mem_bus_s            :   t_mem_bus_slave_array(3 downto 0)       :=  (others => INIT_MEM_BUS_SLAVE);
+signal reset                :   std_logic                               :=  '0';
+signal memIdx               :   natural range 0 to 255                  :=  0;
+
+signal autoReset            :   std_logic                               :=  '0';
+signal autoResetCount       :   unsigned(31 downto 0)                   :=  (others => '0');
 constant AUTO_RESET_TIMER   :   unsigned(autoResetCount'length-1 downto 0)  :=  to_unsigned(1250000000,autoResetCount'length);
-signal trigSync :   std_logic_vector(1 downto 0)    :=  "00";
+signal trigSync             :   std_logic_vector(1 downto 0)            :=  "00";
 
 begin
 
-powerCntrl.start <= ext_i(2);
+signalCntrl.start <= ext_i(2);
+auxCntrl.start <= ext_i(3);
 
-TriggerSyncProc: process(sysClk,aresetn) is
-begin
-    if aresetn = '0' then
-        trigSync <= "00";
-    elsif rising_edge(sysClk) then
-        trigSync <= trigSync(0) & powerCntrl.start;
-    end if;
-end process;
+--TriggerSyncProc: process(sysClk,aresetn) is
+--begin
+--    if aresetn = '0' then
+--        trigSync <= "00";
+--    elsif rising_edge(sysClk) then
+--        trigSync <= trigSync(0) & signalCntrl.start;
+--    end if;
+--end process;
 
-MeasPower: PowerMeasurement
+--
+-- Creates the component that acquires data for the power measurement ("signal")
+--
+SignalAcquisition: DualChannelAcquisition
+generic map(
+    USE_EXT_PULSE   =>  true
+)
 port map(
     sysClk          =>  sysClk,
     adcClk          =>  adcClk,
     aresetn         =>  aresetn,
 
-    cntrl_i         =>  powerCntrl,
+    cntrl_i         =>  signalCntrl,
     adcData_i       =>  adcData_i,
 
-    avgReg0         =>  avgReg0,
-    integrateReg0   =>  integrateReg0,
+    pulseRegs       =>  pulseRegs,
+    avgReg          =>  avgRegSignal,
+    integrateRegs   =>  integrateRegs,
 
-    bus_m           =>  mem_bus_m,
-    bus_s           =>  mem_bus_s,
+    bus_m           =>  mem_bus_m(1 downto 0),
+    bus_s           =>  mem_bus_s(1 downto 0),
 
-    power_o         =>  power,
-    valid_o         =>  powerValid
+    data_o          =>  open,
+    valid_o         =>  open,
+
+    pulse_o         =>  open,
+    shutter_o       =>  open,
+    status_o        =>  open
 );
 
 --
--- AXI communication
+-- Creates the component that acquires data for the power measurement ("aux")
+--
+AuxiliaryAcquisition: DualChannelAcquisition
+generic map(
+    USE_EXT_PULSE   =>  true
+)
+port map(
+    sysClk          =>  sysClk,
+    adcClk          =>  adcClk,
+    aresetn         =>  aresetn,
+
+    cntrl_i         =>  auxCntrl,
+    adcData_i       =>  adcData_i,
+
+    pulseRegs       =>  pulseRegs,
+    avgReg          =>  avgRegAux,
+    integrateRegs   =>  integrateRegs,
+
+    bus_m           =>  mem_bus_m(3 downto 2),
+    bus_s           =>  mem_bus_s(3 downto 2),
+
+    data_o          =>  open,
+    valid_o         =>  open,
+
+    pulse_o         =>  open,
+    shutter_o       =>  open,
+    status_o        =>  open
+);
+
+--
+-- AXI communication routing - connects bus objects to std_logic signals
 --
 bus_m.addr <= addr_i;
 bus_m.valid <= dataValid_i;
@@ -143,22 +200,12 @@ readData_o <= bus_s.data;
 resp_o <= bus_s.resp;
 
 --
--- UART transmission
+-- Assigns appropriate values to pulse registers
 --
-Transmit: UART_Transmitter
-generic map(
-    BAUD_PERIOD =>  BAUD_PERIOD,
-    NUM_BITS    =>  SERIAL_BITS)
-port map(
-    clk         =>  adcClk,
-    dataIn      =>  power,
-    trigIn      =>  powerValid,
-    TxD         =>  TxD,
-    baudTickOut =>  open,
-    busy        =>  open
-);
+avgRegSignal <= avgRegs(0);
+avgRegAux <= avgRegs(0)(avgRegAux'length-1 downto 14) & avgRegs(1)(13 downto 0);
 
-ext_o(2) <= TxD;
+
 
 AutoResetProc: process(sysClk,aresetn) is
 begin
@@ -166,7 +213,7 @@ begin
         autoReset <= '0';
         autoResetCount <= (others => '0');
     elsif rising_edge(sysClk) then
-        if powerCntrl.start = '1' then
+        if signalCntrl.start = '1' or auxCntrl.start = '1' then
             autoResetCount <= (others => '0');
             autoReset <= '0';
         elsif autoResetCount < AUTO_RESET_TIMER then
@@ -182,29 +229,48 @@ begin
 end process;
 
 --
--- Shared registers
+-- This sequence ensures that the memories are reset either on 
+-- the receipt of a reset signal or when the pulses are started
 --
 mem_bus_m(0).reset <= reset or autoReset;
 mem_bus_m(1).reset <= reset or autoReset;
+mem_bus_m(2).reset <= reset or autoReset;
+mem_bus_m(3).reset <= reset or autoReset;
+
+--
+-- Define useful signals for parsing AXI communications
+--
+memIdx <= to_integer(bus_m.addr(31 downto 24)) - 2;
 
 Parse: process(sysClk,aresetn) is
 begin
     if aresetn = '0' then
         comState <= idle;
+        reset <= '0';
         bus_s <= INIT_AXI_BUS_SLAVE;
+        triggers <= (others => '0');
+        sharedReg <= (others => '0');
+        --
+        -- Reset some of the master memory bus signals
+        --
         mem_bus_m(0).addr <= (others => '0');
         mem_bus_m(0).trig <= '0';
         mem_bus_m(0).status <= idle;
         mem_bus_m(1).addr <= (others => '0');
         mem_bus_m(1).trig <= '0';
         mem_bus_m(1).status <= idle;
-
-        triggers <= (others => '0');
-        sharedReg0 <= (others => '0');
+        mem_bus_m(2).addr <= (others => '0');
+        mem_bus_m(2).trig <= '0';
+        mem_bus_m(2).status <= idle;
+        mem_bus_m(3).addr <= (others => '0');
+        mem_bus_m(3).trig <= '0';
+        mem_bus_m(3).status <= idle;
+        
     elsif rising_edge(sysClk) then
         FSM: case(comState) is
             when idle =>
                 triggers <= (others => '0');
+                reset <= '0';
                 bus_s.resp <= "00";
                 if bus_m.valid(0) = '1' then
                     comState <= processing;
@@ -217,77 +283,67 @@ begin
                     --
                     when X"00" =>
                         ParamCase: case(bus_m.addr(23 downto 0)) is
+                            --
+                            -- This issues a reset signal to the memories and writes data to
+                            -- the trigger registers
+                            --
                             when X"000000" => 
                                 rw(bus_m,bus_s,comState,triggers);
                                 reset <= '1';
                                 
-                            when X"000004" => rw(bus_m,bus_s,comState,sharedReg0);
-                            when X"000008" => rw(bus_m,bus_s,comState,avgReg0);
-                            when X"00000C" => rw(bus_m,bus_s,comState,integrateReg0);
+                            when X"000004" => rw(bus_m,bus_s,comState,sharedReg);
+                            -- when X"000008" => rw(bus_m,bus_s,comState,pulseRegs(0));
+                            -- when X"00000C" => rw(bus_m,bus_s,comState,pulseRegs(1));
 
+
+                            when X"000018" => rw(bus_m,bus_s,comState,avgRegs(0));
+                            when X"00001C" => rw(bus_m,bus_s,comState,avgRegs(1));
+                            when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(0));
+                            when X"000024" => rw(bus_m,bus_s,comState,integrateRegs(1));
+                            
                             
                             when others => 
                                 comState <= finishing;
                                 bus_s.resp <= "11";
-                        end case;  
+                        end case;
                     --
-                    -- Read-only properties
+                    -- Read-only parameters
                     --
                     when X"01" =>
-                        ReadOnlyCase: case(bus_m.addr(23 downto 0)) is
+                        ParamCaseReadOnly: case(bus_m.addr(23 downto 0)) is
                             when X"000000" => readOnly(bus_m,bus_s,comState,mem_bus_s(0).last);
                             when X"000004" => readOnly(bus_m,bus_s,comState,mem_bus_s(1).last);
+                            when X"000008" => readOnly(bus_m,bus_s,comState,mem_bus_s(2).last);
+                            when X"00000C" => readOnly(bus_m,bus_s,comState,mem_bus_s(3).last);
                             when others => 
                                 comState <= finishing;
                                 bus_s.resp <= "11";
-                        end case;  
+                        end case;
                     --
-                    -- Read raw/averaged data
+                    -- Read data
+                    -- X"02" => Raw data for signal acquisition
+                    -- X"03" => Integrated data for signal acquisition
+                    -- X"04" => Raw data for aux acquisition
+                    -- X"05" => Integrated data for aux acquisition
                     -- 
-                    -- When the address starts with X"01", then we read from or write to memory
-                    --
-                    when X"02" =>
+                    when X"02" | X"03" | X"04" | X"05" =>
                         if bus_m.valid(1) = '0' then
                             bus_s.resp <= "11";
                             comState <= finishing;
-                            mem_bus_m(0).trig <= '0';
-                            mem_bus_m(0).status <= idle;
-                        elsif mem_bus_s(0).valid = '1' then
-                            bus_s.data <= mem_bus_s(0).data;
+                            mem_bus_m(memIdx).trig <= '0';
+                            mem_bus_m(memIdx).status <= idle;
+                        elsif mem_bus_s(memIdx).valid = '1' then
+                            bus_s.data <= mem_bus_s(memIdx).data;
                             comState <= finishing;
                             bus_s.resp <= "01";
-                            mem_bus_m(0).status <= idle;
-                            mem_bus_m(0).trig <= '0';
-                        elsif mem_bus_m(0).status = idle then
-                            mem_bus_m(0).addr <= bus_m.addr(MEM_ADDR_WIDTH+1 downto 2);
-                            mem_bus_m(0).status <= waiting;
-                            mem_bus_m(0).trig <= '1';
+                            mem_bus_m(memIdx).status <= idle;
+                            mem_bus_m(memIdx).trig <= '0';
+                        elsif mem_bus_m(memIdx).status = idle then
+                            mem_bus_m(memIdx).addr <= bus_m.addr(MEM_ADDR_WIDTH+1 downto 2);
+                            mem_bus_m(memIdx).status <= waiting;
+                            mem_bus_m(memIdx).trig <= '1';
                          else
-                            mem_bus_m(0).trig <= '0';
-                        end if;
-                    --
-                    -- Read processed data
-                    -- 
-                    -- When the address starts with X"02", then we read from or write to memory
-                    --
-                    when X"03" =>
-                        if bus_m.valid(1) = '0' then
-                            bus_s.resp <= "11";
-                            comState <= finishing;
-                            mem_bus_m(1).trig <= '0';
-                            mem_bus_m(1).status <= idle;
-                        elsif mem_bus_s(1).valid = '1' then
-                            bus_s.data <= mem_bus_s(1).data;
-                            comState <= finishing;
-                            bus_s.resp <= "01";
-                            mem_bus_m(1).status <= idle;
-                            mem_bus_m(1).trig <= '0';
-                        elsif mem_bus_m(1).status = idle then
-                            mem_bus_m(1).addr <= bus_m.addr(MEM_ADDR_WIDTH+1 downto 2);
-                            mem_bus_m(1).status <= waiting;
-                            mem_bus_m(1).trig <= '1';
-                         else
-                            mem_bus_m(1).trig <= '0';
+                            mem_bus_m(memIdx).trig <= '0';
                         end if;
                     
                     when others => 

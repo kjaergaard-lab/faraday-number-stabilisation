@@ -388,6 +388,7 @@ ext_o(1) <= shutterSignal when manualFlag = '0' else shutterSignalMan;
 ext_o(2) <= pulseMW when manualFlag = '0' else pulseMWMan;
 ext_o(3) <= pulseSignal;
 ext_o(4) <= pulseAux or ((not statusAux.running) and auxDefaultState) when manualFlag = '0' else pulseAuxMan;
+ext_o(5) <= pulseAux;
 
 --
 -- AXI communication routing - connects bus objects to std_logic signals
