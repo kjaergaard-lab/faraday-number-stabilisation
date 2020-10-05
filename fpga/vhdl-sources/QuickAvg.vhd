@@ -35,7 +35,7 @@ signal log2Avgs     :   natural range 0 to 15   :=  0;
 signal numAvgs      :   unsigned(7 downto 0)    :=  to_unsigned(1,8);
 
 signal avgCount     :   unsigned(numAvgs'length-1 downto 0) :=  (others => '0');
-signal delayCount, sampleCount  :   unsigned(delay'length-1 downto 0)   :=  (others => '0');
+signal delayCount, sampleCount  :   unsigned(delay'length-1 downto 0);
 
 signal state, delayState        :   t_status    :=  idle;
 
@@ -65,7 +65,7 @@ trig_o <= trig;
 TrigDelay: process(clk,aresetn) is
 begin
     if aresetn = '0' then
-        delayCount <= (others => '0');
+        delayCount <= (0 => '1', others => '0');
         trig <= '0';
         delayState <= idle;
     elsif rising_edge(clk) then
@@ -74,12 +74,12 @@ begin
         
         DelayFSM: case delayState is
             when idle =>
+                delayCount <= (0 => '1', others => '0');    --This needs to be here else input triggers get missed somehow
                 if trigOld = '0' and trig_i = '1' then
                     if delay = 0 then
                         trig <= '1';
                     else
                         trig <= '0';
-                        delayCount <= (others => '0');
                         delayState <= waiting;
                     end if;
                 else
@@ -104,7 +104,6 @@ MainProc: process(clk,aresetn) is
 begin
     if aresetn = '0' then
         avgCount <= (others => '0');
---        delayCount <= (others => '0');
         sampleCount <= (others => '0');
         adc1 <= (others => '0');
         adc2 <= (others => '0');
@@ -118,7 +117,6 @@ begin
             when idle =>
                 avgCount <= (others => '0');
                 sampleCount <= to_unsigned(1,sampleCount'length);
---                delayCount <= to_unsigned(1,delayCount'length);
                 adc1 <= (others => '0');
                 adc2 <= (others => '0');
                 valid_o <= '0';

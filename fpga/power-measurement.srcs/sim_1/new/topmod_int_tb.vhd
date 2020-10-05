@@ -5,27 +5,12 @@ use ieee.std_logic_unsigned.all;
 use work.CustomDataTypes.all;
 use work.AXI_Bus_Package.all;
 
-entity topmod is
-    port (
-        sysClk          :   in  std_logic;
-        aresetn         :   in  std_logic;
-        ext_i           :   in  std_logic_vector(7 downto 0);
+entity topmod_int_tb is
+--  Port ( );
+end topmod_int_tb;
 
-        addr_i          :   in  unsigned(AXI_ADDR_WIDTH-1 downto 0);            --Address out
-        writeData_i     :   in  std_logic_vector(AXI_DATA_WIDTH-1 downto 0);    --Data to write
-        dataValid_i     :   in  std_logic_vector(1 downto 0);                   --Data valid out signal
-        readData_o      :   out std_logic_vector(AXI_DATA_WIDTH-1 downto 0);    --Data to read
-        resp_o          :   out std_logic_vector(1 downto 0);                   --Response in
-        
-        ext_o           :   out std_logic_vector(7 downto 0);
-        
-        adcClk          :   in  std_logic;
-        adcData_i       :   in  std_logic_vector(31 downto 0)
-    );
-end topmod;
+architecture Behavioral of topmod_int_tb is
 
-
-architecture Behavioural of topmod is
 
 component DualChannelAcquisition is
     generic(
@@ -73,6 +58,23 @@ component DualChannelAcquisition is
     );
 end component;
 
+--
+-- Testbench signals
+--
+constant clkPeriod      :   time    :=  10 ns;
+
+signal sysClk, adcClk   :   std_logic;
+signal aresetn          :   std_logic;
+signal ext_i, ext_o     :   std_logic_vector(7 downto 0);
+signal adcData_i        :   std_logic_vector(31 downto 0);
+
+signal addr_i           :   unsigned(AXI_ADDR_WIDTH-1 downto 0);
+signal writeData_i      :   std_logic_vector(AXI_DATA_WIDTH-1 downto 0);
+signal dataValid_i      :   std_logic_vector(1 downto 0);
+signal readData_o       :   std_logic_vector(AXI_DATA_WIDTH-1 downto 0);
+signal resp_o           :   std_logic_vector(1 downto 0);
+
+
 
 --
 -- AXI communication signals
@@ -111,15 +113,9 @@ signal mem_bus_s            :   t_mem_bus_slave_array(3 downto 0)       :=  (oth
 signal reset                :   std_logic                               :=  '0';
 signal memIdx               :   natural range 0 to 255                  :=  0;
 
---
--- The auto reset count stuff needed to be both longer (40 bits wide) and the increment had to be defined
--- as an unsigned value (even when it was 32 bits long) in order for it to work properly.  Not sure what the issue
--- was, but it seemed to be "kind-of" resetting during pulse sequences.
---
 signal autoReset            :   std_logic                               :=  '0';
-signal autoResetCount       :   unsigned(39 downto 0)                   :=  (others => '0');
-constant AUTO_RESET_TIME    :   unsigned(autoResetCount'length-1 downto 0)  :=  to_unsigned(1250000000,autoResetCount'length);
-constant AUTO_RESET_INCR    :   unsigned(autoResetCount'length-1 downto 0)  :=  (0 => '1', others => '0');
+signal autoResetCount       :   unsigned(31 downto 0)                   :=  (others => '0');
+constant AUTO_RESET_TIMER   :   unsigned(autoResetCount'length-1 downto 0)  :=  to_unsigned(1250000000,autoResetCount'length);
 signal trigSync             :   std_logic_vector(1 downto 0)            :=  "00";
 
 begin
@@ -127,14 +123,6 @@ begin
 signalCntrl.start <= ext_i(2);
 auxCntrl.start <= ext_i(3);
 
---TriggerSyncProc: process(sysClk,aresetn) is
---begin
---    if aresetn = '0' then
---        trigSync <= "00";
---    elsif rising_edge(sysClk) then
---        trigSync <= trigSync(0) & signalCntrl.start;
---    end if;
---end process;
 
 --
 -- Creates the component that acquires data for the power measurement ("signal")
@@ -222,11 +210,11 @@ begin
         if signalCntrl.start = '1' or auxCntrl.start = '1' then
             autoResetCount <= (others => '0');
             autoReset <= '0';
-        elsif autoResetCount < AUTO_RESET_TIME then
-            autoResetCount <= autoResetCount + AUTO_RESET_INCR;
+        elsif autoResetCount < AUTO_RESET_TIMER then
+            autoResetCount <= autoResetCount + 1;
             autoReset <= '0';
-        elsif autoResetCount = AUTO_RESET_TIME then
-            autoResetCount <= autoResetCount + AUTO_RESET_INCR;
+        elsif autoResetCount = AUTO_RESET_TIMER then
+            autoResetCount <= autoResetCount + 1;
             autoReset <= '1';
         else
             autoReset <= '0';
@@ -242,6 +230,52 @@ mem_bus_m(0).reset <= reset or autoReset;
 mem_bus_m(1).reset <= reset or autoReset;
 mem_bus_m(2).reset <= reset or autoReset;
 mem_bus_m(3).reset <= reset or autoReset;
+
+
+--
+-- Testbench processes
+--
+clk_process :process
+begin
+	adcClk <= '0';
+	sysClk <= '0';
+	wait for clkPeriod/2;
+	adcClk <= '1';
+	sysClk <= '1';
+	wait for clkPeriod/2;
+end process;
+
+adcData_i <= std_logic_vector(to_unsigned(4000,16) & to_unsigned(3000,16)) when ext_i(2) = '1' else (others => '0');
+
+tb: process
+begin
+    aresetn <= '0';
+    addr_i <= (others => '0');
+    writeData_i <= (others => '0');
+    dataValid_i <= (others => '0');
+--    adcData_i <= std_logic_vector(to_unsigned(4000,16) & to_unsigned(3000,16));
+    ext_i <= (others => '0');
+    avgRegs(0) <= std_logic_vector(to_unsigned(0,4) & to_unsigned(500,14) & to_unsigned(0,14));
+    avgRegs(1) <= std_logic_vector(to_unsigned(0,4) & to_unsigned(500,14) & to_unsigned(0,14));
+    integrateRegs(0) <= std_logic_vector(to_unsigned(100,10) & to_unsigned(150,11) & to_unsigned(1,11));
+    integrateRegs(1) <= (others => '0');
+    wait for 100 ns;
+    aresetn <= '1';
+    wait until adcClk'event and adcClk = '1';
+--    wait for 1
+    ext_i(2) <= '1';
+    wait for 1000 ns;
+    wait until adcClk'event and adcClk = '1';
+    ext_i(2) <= '0';
+    wait for 5000 ns;
+    wait until adcClk'event and adcClk = '1';
+    ext_i(2) <= '1';
+    wait for 1000 ns;
+    wait until adcClk'event and adcClk = '1';
+    ext_i(2) <= '0';
+    wait;
+end process;
+
 
 --
 -- Define useful signals for parsing AXI communications
@@ -272,99 +306,99 @@ begin
         mem_bus_m(3).trig <= '0';
         mem_bus_m(3).status <= idle;
         
-    elsif rising_edge(sysClk) then
-        FSM: case(comState) is
-            when idle =>
-                triggers <= (others => '0');
-                reset <= '0';
-                bus_s.resp <= "00";
-                if bus_m.valid(0) = '1' then
-                    comState <= processing;
-                end if;
+--    elsif rising_edge(sysClk) then
+--        FSM: case(comState) is
+--            when idle =>
+--                triggers <= (others => '0');
+--                reset <= '0';
+--                bus_s.resp <= "00";
+--                if bus_m.valid(0) = '1' then
+--                    comState <= processing;
+--                end if;
 
-            when processing =>
-                AddrCase: case(bus_m.addr(31 downto 24)) is
-                    --
-                    -- Parameter parsing
-                    --
-                    when X"00" =>
-                        ParamCase: case(bus_m.addr(23 downto 0)) is
-                            --
-                            -- This issues a reset signal to the memories and writes data to
-                            -- the trigger registers
-                            --
-                            when X"000000" => 
-                                rw(bus_m,bus_s,comState,triggers);
-                                reset <= '1';
+--            when processing =>
+--                AddrCase: case(bus_m.addr(31 downto 24)) is
+--                    --
+--                    -- Parameter parsing
+--                    --
+--                    when X"00" =>
+--                        ParamCase: case(bus_m.addr(23 downto 0)) is
+--                            --
+--                            -- This issues a reset signal to the memories and writes data to
+--                            -- the trigger registers
+--                            --
+--                            when X"000000" => 
+--                                rw(bus_m,bus_s,comState,triggers);
+--                                reset <= '1';
                                 
-                            when X"000004" => rw(bus_m,bus_s,comState,sharedReg);
-                            -- when X"000008" => rw(bus_m,bus_s,comState,pulseRegs(0));
-                            -- when X"00000C" => rw(bus_m,bus_s,comState,pulseRegs(1));
+--                            when X"000004" => rw(bus_m,bus_s,comState,sharedReg);
+--                            -- when X"000008" => rw(bus_m,bus_s,comState,pulseRegs(0));
+--                            -- when X"00000C" => rw(bus_m,bus_s,comState,pulseRegs(1));
 
 
-                            when X"000018" => rw(bus_m,bus_s,comState,avgRegs(0));
-                            when X"00001C" => rw(bus_m,bus_s,comState,avgRegs(1));
-                            when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(0));
-                            when X"000024" => rw(bus_m,bus_s,comState,integrateRegs(1));
+--                            when X"000018" => rw(bus_m,bus_s,comState,avgRegs(0));
+--                            when X"00001C" => rw(bus_m,bus_s,comState,avgRegs(1));
+--                            when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(0));
+--                            when X"000024" => rw(bus_m,bus_s,comState,integrateRegs(1));
                             
                             
-                            when others => 
-                                comState <= finishing;
-                                bus_s.resp <= "11";
-                        end case;
-                    --
-                    -- Read-only parameters
-                    --
-                    when X"01" =>
-                        ParamCaseReadOnly: case(bus_m.addr(23 downto 0)) is
-                            when X"000000" => readOnly(bus_m,bus_s,comState,mem_bus_s(0).last);
-                            when X"000004" => readOnly(bus_m,bus_s,comState,mem_bus_s(1).last);
-                            when X"000008" => readOnly(bus_m,bus_s,comState,mem_bus_s(2).last);
-                            when X"00000C" => readOnly(bus_m,bus_s,comState,mem_bus_s(3).last);
-                            when others => 
-                                comState <= finishing;
-                                bus_s.resp <= "11";
-                        end case;
-                    --
-                    -- Read data
-                    -- X"02" => Raw data for signal acquisition
-                    -- X"03" => Integrated data for signal acquisition
-                    -- X"04" => Raw data for aux acquisition
-                    -- X"05" => Integrated data for aux acquisition
-                    -- 
-                    when X"02" | X"03" | X"04" | X"05" =>
-                        if bus_m.valid(1) = '0' then
-                            bus_s.resp <= "11";
-                            comState <= finishing;
-                            mem_bus_m(memIdx).trig <= '0';
-                            mem_bus_m(memIdx).status <= idle;
-                        elsif mem_bus_s(memIdx).valid = '1' then
-                            bus_s.data <= mem_bus_s(memIdx).data;
-                            comState <= finishing;
-                            bus_s.resp <= "01";
-                            mem_bus_m(memIdx).status <= idle;
-                            mem_bus_m(memIdx).trig <= '0';
-                        elsif mem_bus_m(memIdx).status = idle then
-                            mem_bus_m(memIdx).addr <= bus_m.addr(MEM_ADDR_WIDTH+1 downto 2);
-                            mem_bus_m(memIdx).status <= waiting;
-                            mem_bus_m(memIdx).trig <= '1';
-                         else
-                            mem_bus_m(memIdx).trig <= '0';
-                        end if;
+--                            when others => 
+--                                comState <= finishing;
+--                                bus_s.resp <= "11";
+--                        end case;
+--                    --
+--                    -- Read-only parameters
+--                    --
+--                    when X"01" =>
+--                        ParamCaseReadOnly: case(bus_m.addr(23 downto 0)) is
+--                            when X"000000" => readOnly(bus_m,bus_s,comState,mem_bus_s(0).last);
+--                            when X"000004" => readOnly(bus_m,bus_s,comState,mem_bus_s(1).last);
+--                            when X"000008" => readOnly(bus_m,bus_s,comState,mem_bus_s(2).last);
+--                            when X"00000C" => readOnly(bus_m,bus_s,comState,mem_bus_s(3).last);
+--                            when others => 
+--                                comState <= finishing;
+--                                bus_s.resp <= "11";
+--                        end case;
+--                    --
+--                    -- Read data
+--                    -- X"02" => Raw data for signal acquisition
+--                    -- X"03" => Integrated data for signal acquisition
+--                    -- X"04" => Raw data for aux acquisition
+--                    -- X"05" => Integrated data for aux acquisition
+--                    -- 
+--                    when X"02" | X"03" | X"04" | X"05" =>
+--                        if bus_m.valid(1) = '0' then
+--                            bus_s.resp <= "11";
+--                            comState <= finishing;
+--                            mem_bus_m(memIdx).trig <= '0';
+--                            mem_bus_m(memIdx).status <= idle;
+--                        elsif mem_bus_s(memIdx).valid = '1' then
+--                            bus_s.data <= mem_bus_s(memIdx).data;
+--                            comState <= finishing;
+--                            bus_s.resp <= "01";
+--                            mem_bus_m(memIdx).status <= idle;
+--                            mem_bus_m(memIdx).trig <= '0';
+--                        elsif mem_bus_m(memIdx).status = idle then
+--                            mem_bus_m(memIdx).addr <= bus_m.addr(MEM_ADDR_WIDTH+1 downto 2);
+--                            mem_bus_m(memIdx).status <= waiting;
+--                            mem_bus_m(memIdx).trig <= '1';
+--                         else
+--                            mem_bus_m(memIdx).trig <= '0';
+--                        end if;
                     
-                    when others => 
-                        comState <= finishing;
-                        bus_s.resp <= "11";
-                end case;
-            when finishing =>
-                triggers <= (others => '0');
-                reset <= '0';
-                comState <= idle;
+--                    when others => 
+--                        comState <= finishing;
+--                        bus_s.resp <= "11";
+--                end case;
+--            when finishing =>
+--                triggers <= (others => '0');
+--                reset <= '0';
+--                comState <= idle;
 
-            when others => comState <= idle;
-        end case;
+--            when others => comState <= idle;
+--        end case;
     end if;
 end process;
 
-    
-end architecture Behavioural;
+
+end Behavioral;
