@@ -3,6 +3,7 @@ classdef DPPower < handle
         signal
         aux
         
+        period
         t
     end
     
@@ -38,7 +39,7 @@ classdef DPPower < handle
     properties(Constant)
         CLK = 125e6;
         MAX_SUM_RANGE = 2^11-1;
-        HOST_ADDRESS = '172.22.250.94';
+        HOST_ADDRESS = '172.22.250.189';
     end
     
     methods
@@ -92,10 +93,10 @@ classdef DPPower < handle
                 .setFunctions('to',@(x) x,'from',@(x) x);
             self.offsets = DPFeedbackParameter([0,13],self.integrateRegs(2))...
                 .setLimits('lower',-2^13,'upper',2^13)...
-                .setFunctions('to',@(x) typecast(int32(round(x)),'uint32'),'from',@(x) double(typecast(x,'int32')));
+                .setFunctions('to',@(x) typecast(int32(round(x)),'uint32'),'from',@(x) double(typecast(uint32(x),'int32')));
             self.offsets(2) = DPFeedbackParameter([27,14],self.integrateRegs(2))...
                 .setLimits('lower',-2^13,'upper',2^13)...
-                .setFunctions('to',@(x) typecast(int32(round(x)),'uint32'),'from',@(x) double(typecast(x,'int32')));
+                .setFunctions('to',@(x) typecast(int32(round(x)),'uint32'),'from',@(x) double(typecast(uint32(x),'int32')));
             self.usePresetOffsets = DPFeedbackParameter([28,28],self.integrateRegs(2))...
                 .setLimits('lower',0,'upper',1)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
@@ -152,6 +153,24 @@ classdef DPPower < handle
                 error('Subtraction interval is outside of number sample collection range')
             end
 
+        end
+        
+        function self = copyfb(self,fb)
+            self.period = fb.period.get;
+            
+            self.delaySignal.set(fb.delaySignal.get);
+            self.delayAux.set(fb.delayAux.get);
+            self.samplesPerPulse.set(fb.samplesPerPulse.get);
+            self.log2Avgs.set(fb.log2Avgs.get);
+            
+            self.sumStart.set(fb.sumStart.get);
+            self.subStart.set(fb.subStart.get);
+            self.sumWidth.set(fb.sumWidth.get);
+            
+            self.offsets(1).set(fb.offsets(1).get);
+            self.offsets(2).set(fb.offsets(2).get);
+            self.usePresetOffsets.set(fb.usePresetOffsets.get);
+            
         end
         
         function self = upload(self)
@@ -255,10 +274,10 @@ classdef DPPower < handle
                 end
                 if qq == 1
                     self.signal.data = data/self.sumWidth.value;
-                    self.signal.t = self.period.value*(0:(self.pulsesCollected(qq).value-1))';
+                    self.signal.t = self.period*(0:(self.pulsesCollected(qq).value-1))';
                 elseif qq == 2
                     self.aux.data = data/self.sumWidth.value;
-                    self.aux.t = self.period.value*(0:(self.pulsesCollected(qq).value-1))';
+                    self.aux.t = self.period*(0:(self.pulsesCollected(qq).value-1))';
                 end
             end
         end
