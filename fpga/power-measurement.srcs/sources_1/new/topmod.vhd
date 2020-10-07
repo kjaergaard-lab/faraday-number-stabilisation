@@ -124,6 +124,8 @@ signal trigSync             :   std_logic_vector(1 downto 0)            :=  "00"
 
 begin
 
+ext_o <= (others => '0');
+
 signalCntrl.start <= ext_i(2);
 auxCntrl.start <= ext_i(3);
 
@@ -220,6 +222,8 @@ begin
         autoResetCount <= (others => '0');
     elsif rising_edge(sysClk) then
         if signalCntrl.start = '1' or auxCntrl.start = '1' then
+--        if signalCntrl.start = '1' then
+--        if ext_i(2) = '1' or ext_i(3) = '1' then
             autoResetCount <= (others => '0');
             autoReset <= '0';
         elsif autoResetCount < AUTO_RESET_TIME then

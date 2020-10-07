@@ -164,13 +164,13 @@ begin
 -- the shutter is closed.  This process makes sure that there is a sufficient delay between
 -- when the shutter is closed and when the module says it is finished running.
 --
-StatusProc: process(sysClk,aresetn) is
+StatusProc: process(adcClk,aresetn) is
 begin
     if aresetn = '0' then
         status_o <= INIT_MODULE_STATUS;
         statusCount <= (others => '0');
         state <= idle;
-    elsif rising_edge(sysClk) then
+    elsif rising_edge(adcClk) then
         FSM: case state is
             when idle =>
                 statusCount <= (others => '0');
@@ -221,6 +221,7 @@ ExternalPulses: if USE_EXT_PULSE = true generate
     pulse <= cntrl_i.start;
     pulse_o <= cntrl_i.start;
     shutter_o <= '0';
+    pulseStatus <= INIT_MODULE_STATUS;
 end generate ExternalPulses;
 
 InitAvg: QuickAvg
