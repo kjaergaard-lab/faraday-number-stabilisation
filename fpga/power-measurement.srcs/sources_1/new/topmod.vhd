@@ -90,17 +90,50 @@ signal sharedReg        :   t_param_reg :=  (others => '0');
 --
 -- Acquisition registers
 --
-signal pulseRegs        :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
-signal avgRegs          :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
-signal avgRegSignal     :   t_param_reg                     :=  (others => '0');
-signal avgRegAux        :   t_param_reg                     :=  (others => '0');
-signal integrateRegs    :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
+signal pulseRegs            :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
+signal pulseRegsSignal      :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
+signal pulseRegsAux         :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
+signal avgRegSignal         :   t_param_reg                     :=  (others => '0');
+signal avgRegAux            :   t_param_reg                     :=  (others => '0');
+signal avgRegs              :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
+signal integrateRegs        :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
 
 --
--- Power acquisition signals
+-- Shared signals
 --
-signal signalCntrl       :   t_control                               :=  INIT_CONTROL_ENABLED;
-signal auxCntrl          :   t_control                               :=  INIT_CONTROL_ENABLED;
+signal trig                 :   std_logic                       :=  '0';
+signal manualFlag           :   std_logic                       :=  '0';
+signal acqControl_i         :   t_control                       :=  INIT_CONTROL_ENABLED;
+
+--
+-- Signal acquisition signals
+--
+signal cntrlSignal_i        :   t_control                       :=  INIT_CONTROL_ENABLED;
+signal pulseSignal          :   std_logic;
+signal shutterSignal        :   std_logic;
+signal statusSignal         :   t_module_status                 :=  INIT_MODULE_STATUS;
+
+signal pulseSignalMan       :   std_logic                       :=  '0';
+signal shutterSignalMan     :   std_logic                       :=  '0';
+signal signalDefaultState   :   std_logic                       :=  '1';
+
+signal dataIntSignal        :   t_adc_integrated_array(1 downto 0)  :=  (others => (others => '0'));
+signal validIntSignal       :   std_logic                       :=  '0';
+
+--
+-- Auxiliary acquisition signals
+--
+signal cntrlAux_i           :   t_control                       :=  INIT_CONTROL_ENABLED;
+signal pulseAux             :   std_logic;
+signal shutterAux           :   std_logic;
+signal statusAux            :   t_module_status                 :=  INIT_MODULE_STATUS;
+
+signal pulseAuxMan          :   std_logic                       :=  '0';
+signal shutterAuxMan        :   std_logic                       :=  '0';
+signal auxDefaultState      :   std_logic                       :=  '1';
+
+signal dataIntAux           :   t_adc_integrated_array(1 downto 0)  :=  (others => (others => '0'));
+signal validIntAux          :   std_logic                       :=  '0';
 
 
 --
@@ -126,34 +159,22 @@ begin
 
 ext_o <= (others => '0');
 
-signalCntrl.start <= ext_i(2);
-auxCntrl.start <= ext_i(3);
-
---TriggerSyncProc: process(sysClk,aresetn) is
---begin
---    if aresetn = '0' then
---        trigSync <= "00";
---    elsif rising_edge(sysClk) then
---        trigSync <= trigSync(0) & signalCntrl.start;
---    end if;
---end process;
-
 --
 -- Creates the component that acquires data for the power measurement ("signal")
 --
 SignalAcquisition: DualChannelAcquisition
 generic map(
-    USE_EXT_PULSE   =>  true
+    USE_EXT_PULSE   =>  false
 )
 port map(
     sysClk          =>  sysClk,
     adcClk          =>  adcClk,
     aresetn         =>  aresetn,
 
-    cntrl_i         =>  signalCntrl,
+    cntrl_i         =>  cntrlSignal_i,
     adcData_i       =>  adcData_i,
 
-    pulseRegs       =>  pulseRegs,
+    pulseRegs       =>  pulseRegsSignal,
     avgReg          =>  avgRegSignal,
     integrateRegs   =>  integrateRegs,
 
@@ -173,17 +194,17 @@ port map(
 --
 AuxiliaryAcquisition: DualChannelAcquisition
 generic map(
-    USE_EXT_PULSE   =>  true
+    USE_EXT_PULSE   =>  false
 )
 port map(
     sysClk          =>  sysClk,
     adcClk          =>  adcClk,
     aresetn         =>  aresetn,
 
-    cntrl_i         =>  auxCntrl,
+    cntrl_i         =>  cntrlAux_i,
     adcData_i       =>  adcData_i,
 
-    pulseRegs       =>  pulseRegs,
+    pulseRegs       =>  pulseRegsAux,
     avgReg          =>  avgRegAux,
     integrateRegs   =>  integrateRegs,
 
@@ -210,42 +231,44 @@ resp_o <= bus_s.resp;
 --
 -- Assigns appropriate values to pulse registers
 --
+pulseRegsSignal(1 downto 0) <= pulseRegs(1 downto 0);
+pulseRegsAux(1 downto 0) <= pulseRegs(1 downto 0);
 avgRegSignal <= avgRegs(0);
 avgRegAux <= avgRegs(0)(avgRegAux'length-1 downto 14) & avgRegs(1)(13 downto 0);
 
+--
+-- Shared registers
+--
+trig <= ext_i(2);
+cntrlSignal_i.start <= triggers(0) or trig;
+cntrlAux_i.start <= triggers(0) or trig;
+
+cntrlSignal_i.enable <= sharedReg(0);
+cntrlAux_i.enable <= sharedReg(0);
 
 
-AutoResetProc: process(sysClk,aresetn) is
-begin
-    if aresetn = '0' then
-        autoReset <= '0';
-        autoResetCount <= (others => '0');
-    elsif rising_edge(sysClk) then
-        if signalCntrl.start = '1' or auxCntrl.start = '1' then
---        if signalCntrl.start = '1' then
---        if ext_i(2) = '1' or ext_i(3) = '1' then
-            autoResetCount <= (others => '0');
-            autoReset <= '0';
-        elsif autoResetCount < AUTO_RESET_TIME then
-            autoResetCount <= autoResetCount + AUTO_RESET_INCR;
-            autoReset <= '0';
-        elsif autoResetCount = AUTO_RESET_TIME then
-            autoResetCount <= autoResetCount + AUTO_RESET_INCR;
-            autoReset <= '1';
-        else
-            autoReset <= '0';
-        end if;
-    end if;
-end process;
+
+signalDefaultState <= sharedReg(4);
+auxDefaultState <= sharedReg(5);
+
+--
+-- Manual signals
+--
+manualFlag <= sharedReg(31);
+pulseSignalMan <= sharedReg(30);
+shutterSignalMan <= sharedReg(29);
+
+pulseAuxMan <= sharedReg(27);
+shutterAuxMan <= sharedReg(26);
 
 --
 -- This sequence ensures that the memories are reset either on 
 -- the receipt of a reset signal or when the pulses are started
 --
-mem_bus_m(0).reset <= reset or autoReset;
-mem_bus_m(1).reset <= reset or autoReset;
-mem_bus_m(2).reset <= reset or autoReset;
-mem_bus_m(3).reset <= reset or autoReset;
+mem_bus_m(0).reset <= reset or cntrlSignal_i.start;
+mem_bus_m(1).reset <= reset or cntrlSignal_i.start;
+mem_bus_m(2).reset <= reset or cntrlAux_i.start;
+mem_bus_m(3).reset <= reset or cntrlAux_i.start;
 
 --
 -- Define useful signals for parsing AXI communications
@@ -302,10 +325,10 @@ begin
                                 reset <= '1';
                                 
                             when X"000004" => rw(bus_m,bus_s,comState,sharedReg);
-                            -- when X"000008" => rw(bus_m,bus_s,comState,pulseRegs(0));
-                            -- when X"00000C" => rw(bus_m,bus_s,comState,pulseRegs(1));
-
-
+                            when X"000008" => rw(bus_m,bus_s,comState,pulseRegs(0));
+                            when X"00000C" => rw(bus_m,bus_s,comState,pulseRegs(1));
+                            when X"000010" => rw(bus_m,bus_s,comState,pulseRegsSignal(2));
+                            when X"000014" => rw(bus_m,bus_s,comState,pulseRegsAux(2));
                             when X"000018" => rw(bus_m,bus_s,comState,avgRegs(0));
                             when X"00001C" => rw(bus_m,bus_s,comState,avgRegs(1));
                             when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(0));
