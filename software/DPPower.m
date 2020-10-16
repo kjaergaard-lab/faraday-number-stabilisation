@@ -3,12 +3,21 @@ classdef DPPower < handle
         signal
         aux
         
-        period
         t
     end
     
     properties(SetAccess = immutable)
         conn
+        
+        enableDP
+        dpOnShutterOff
+        auxOnShutterOff
+        
+        width
+        numpulses
+        period
+        shutterDelay
+        auxDelay
         
         delaySignal
         delayAux
@@ -23,12 +32,18 @@ classdef DPPower < handle
 
         samplesCollected
         pulsesCollected
+        
+        manualFlag
+        pulseDPMan
+        shutterDPMan
+        auxMan
 
     end
     
     properties(SetAccess = protected)
         trigReg
         sharedReg
+        pulseRegs
         avgRegs
         integrateRegs
         
@@ -56,6 +71,10 @@ classdef DPPower < handle
             % R/W registers
             self.trigReg = DPFeedbackRegister('0',self.conn);
             self.sharedReg = DPFeedbackRegister('4',self.conn);
+            self.pulseRegs = DPFeedbackRegister('8',self.conn);
+            self.pulseRegs(2) = DPFeedbackRegister('C',self.conn);
+            self.pulseRegs(3) = DPFeedbackRegister('10',self.conn);
+            self.pulseRegs(4) = DPFeedbackRegister('14',self.conn);
             self.avgRegs = DPFeedbackRegister('18',self.conn);
             self.avgRegs(2) = DPFeedbackRegister('1C',self.conn);
             self.integrateRegs = DPFeedbackRegister('20',self.conn);
@@ -66,6 +85,31 @@ classdef DPPower < handle
             self.pulsesRegs = DPFeedbackRegister('01000004',self.conn);
             self.sampleRegs(2) = DPFeedbackRegister('01000008',self.conn);
             self.pulsesRegs(2) = DPFeedbackRegister('0100000C',self.conn);
+            
+            %Shared registers
+            self.enableDP = DPFeedbackParameter([0,0],self.sharedReg)...
+                .setLimits('lower',0,'upper',1);
+            self.dpOnShutterOff = DPFeedbackParameter([4,4],self.sharedReg)...
+                .setLimits('lower',0,'upper',1);
+            self.auxOnShutterOff = DPFeedbackParameter([5,5],self.sharedReg)...
+                .setLimits('lower',0,'upper',1);
+            
+            %Pulse generation
+            self.width = DPFeedbackParameter([0,15],self.pulseRegs(1))...
+                .setLimits('lower',100e-9,'upper',10e-3)...
+                .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
+            self.numpulses = DPFeedbackParameter([16,31],self.pulseRegs(1))...
+                .setLimits('lower',0,'upper',2^16-1)...
+                .setFunctions('to',@(x) round(x),'from',@(x) x);
+            self.period = DPFeedbackParameter([0,31],self.pulseRegs(2))...
+                .setLimits('lower',500e-9,'upper',10)...
+                .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
+            self.shutterDelay = DPFeedbackParameter([0,31],self.pulseRegs(3))...
+                .setLimits('lower',0,'upper',10)...
+                .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
+            self.auxDelay = DPFeedbackParameter([0,31],self.pulseRegs(4))...
+                .setLimits('lower',0,'upper',10)...
+                .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
             
             %Initial processing
             self.delaySignal = DPFeedbackParameter([0,13],self.avgRegs(1))...
@@ -115,9 +159,29 @@ classdef DPPower < handle
                 .setLimits('lower',0,'upper',2^14)...
                 .setFunctions('to',@(x) x,'from',@(x) round(x/2));
             
+            % Manual settings
+            self.manualFlag = DPFeedbackParameter([31,31],self.sharedReg)...
+                .setLimits('lower',0,'upper',1);
+            self.pulseDPMan = DPFeedbackParameter([30,30],self.sharedReg)...
+                .setLimits('lower',0,'upper',1);
+            self.shutterDPMan = DPFeedbackParameter([29,29],self.sharedReg)...
+                .setLimits('lower',0,'upper',1);
+            self.auxMan = DPFeedbackParameter([27,27],self.sharedReg)...
+                .setLimits('lower',0,'upper',1);
+            
         end
         
         function self = setDefaults(self,varargin)
+            
+            self.enableDP.set(1);
+            self.dpOnShutterOff.set(0);
+            self.auxOnShutterOff.set(0);
+            
+            self.width.set(1e-6);
+            self.numpulses.set(50);
+            self.period.set(5e-6);
+            self.shutterDelay.set(2.5e-3);
+            self.auxDelay.set(2.5e-3);
             
             self.delaySignal.set(500e-9);
             self.delayAux.set(1.75e-6);
@@ -135,9 +199,17 @@ classdef DPPower < handle
             self.samplesCollected(2).set(0);
             self.pulsesCollected(1).set(0);
             self.pulsesCollected(2).set(0);
+            
+            self.manualFlag.set(0);
+            self.pulseDPMan.set(0);
+            self.shutterDPMan.set(0);
+            self.auxMan.set(0);
         end
         
         function self = check(self)
+            if self.width.get >= self.period.get
+                error('Dispersive pulse width should be less than dispersive pulse period');
+            end
             
             if self.sumStart.get+self.sumWidth.get > self.MAX_SUM_RANGE
                 error('End of summation range is larger than %d',self.MAX_SUM_RANGE);
@@ -156,7 +228,15 @@ classdef DPPower < handle
         end
         
         function self = copyfb(self,fb)
-            self.period = fb.period.get;
+            self.enableDP.set(fb.enableDP.get);
+            self.dpOnShutterOff.set(fb.dpOnShutterOff.get);
+            self.auxOnShutterOff.set(fb.auxOnShutterOff.get);
+            
+            self.width.set(fb.width.get);
+            self.numpulses.set(fb.numpulses.get);
+            self.period.set(fb.period.get);
+            self.shutterDelay.set(fb.shutterDelay.get);
+            self.auxDelay.set(fb.auxDelay.get);
             
             self.delaySignal.set(fb.delaySignal.get);
             self.delayAux.set(fb.delayAux.get);
@@ -171,12 +251,17 @@ classdef DPPower < handle
             self.offsets(2).set(fb.offsets(2).get);
             self.usePresetOffsets.set(fb.usePresetOffsets.get);
             
+            self.manualFlag.set(fb.manualFlag.get);
+            self.pulseDPMan.set(fb.pulseDPMan.get);
+            self.shutterDPMan.set(fb.shutterDPMan.get);
+            self.auxMan.set(fb.auxMan.get);
+            
         end
         
         function self = upload(self)
             self.check;
             self.sharedReg.write;
-
+            self.pulseRegs.write;
             self.avgRegs.write;
             self.integrateRegs.write;
 
@@ -185,12 +270,22 @@ classdef DPPower < handle
         function self = fetch(self)
             %Read registers
             self.sharedReg.read;
-
+            self.pulseRegs.read;
             self.avgRegs.read;
             self.integrateRegs.read;
 
             
-            %Read parameters         
+            %Read parameters      
+            self.enableDP.get;
+            self.dpOnShutterOff.get;
+            self.auxOnShutterOff.get;
+            
+            self.width.get;
+            self.numpulses.get;
+            self.period.get;
+            self.shutterDelay.get;
+            self.auxDelay.get;
+            
             self.delaySignal.get;
             self.delayAux.get;
             self.samplesPerPulse.get;
@@ -207,6 +302,12 @@ classdef DPPower < handle
             %Get number of collected samples
             self.samplesCollected.read;
             self.pulsesCollected.read;
+            
+            %Manual signals
+            self.manualFlag.get;
+            self.pulseDPMan.get;
+            self.shutterDPMan.get;
+            self.auxMan.get;
             
         end
         
@@ -274,10 +375,10 @@ classdef DPPower < handle
                 end
                 if qq == 1
                     self.signal.data = data/self.sumWidth.value;
-                    self.signal.t = self.period*(0:(self.pulsesCollected(qq).value-1))';
+                    self.signal.t = self.period.value*(0:(self.pulsesCollected(qq).value-1))';
                 elseif qq == 2
                     self.aux.data = data/self.sumWidth.value;
-                    self.aux.t = self.period*(0:(self.pulsesCollected(qq).value-1))';
+                    self.aux.t = self.period.value*(0:(self.pulsesCollected(qq).value-1))';
                 end
             end
         end
@@ -294,11 +395,24 @@ classdef DPPower < handle
             fprintf(1,'DPPower object with properties:\n');
             fprintf(1,'\t Registers\n');
             self.sharedReg.makeString('sharedReg',strwidth);
+            self.pulseRegs.makeString('pulseRegs',strwidth);
             self.avgRegs.makeString('avgReg',strwidth);
             self.integrateRegs.makeString('integrateRegs',strwidth);
             self.sampleRegs.makeString('sampleRegs',strwidth);
             self.pulsesRegs.makeString('pulsesRegs',strwidth);
             fprintf(1,'\t ----------------------------------\n');
+            fprintf(1,'\t Auxiliary Parameters\n');
+            fprintf(1,'\t\t          Enable DP: %d\n',self.enableDP.value);
+            fprintf(1,'\t\t  DP on Shutter off: %d\n',self.dpOnShutterOff.value);
+            fprintf(1,'\t\t Aux on Shutter off: %d\n',self.auxOnShutterOff.value);
+            fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
+            fprintf(1,'\t Pulse Parameters\n');
+            fprintf(1,'\t\t       Pulse Width: %.2e s\n',self.width.value);
+            fprintf(1,'\t\t      Pulse Period: %.2e s\n',self.period.value);
+            fprintf(1,'\t\t     Shutter Delay: %.2e s\n',self.shutterDelay.value);
+            fprintf(1,'\t\t         Aux Delay: %.2e s\n',self.auxDelay.value);
+            fprintf(1,'\t\t  Number of pulses: %d\n',self.numpulses.value);
+            fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Averaging Parameters\n');
             fprintf(1,'\t\t       Signal Delay: %.2e s\n',self.delaySignal.value);
             fprintf(1,'\t\t          Aux Delay: %.2e s\n',self.delayAux.value);
