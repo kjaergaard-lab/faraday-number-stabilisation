@@ -332,7 +332,7 @@ classdef DPFeedback < handle
             self.pulseRegs.write;
             self.avgRegs.write;
             self.integrateRegs.write;
-            self.gainComputeReg.write;
+%             self.gainComputeReg.write;
             self.signalComputeRegs.write;
             self.fbComputeRegs.write;
             self.fbPulseRegs.write;
@@ -344,7 +344,7 @@ classdef DPFeedback < handle
             self.pulseRegs.read;
             self.avgRegs.read;
             self.integrateRegs.read;
-            self.gainComputeReg.read;
+%             self.gainComputeReg.read;
             self.signalComputeRegs.read;
             self.fbComputeRegs.read;
             self.fbPulseRegs.read;
@@ -486,10 +486,10 @@ classdef DPFeedback < handle
                 self.gains = fix(repmat([self.presetGains.value],numel(self.signal.t),1));
             else
                 if strcmpi(method,'int')
-                    self.gains = fix(self.aux.data.*self.sumWidth.value).*fix(repmat([self.auxMultipliers.value],size(self.aux.data,1),1));
+                    self.gains = fix(self.aux.data.*self.sumWidth.value);
                     self.gains = fix(self.gains);
                 elseif strcmpi(method,'float')
-                    self.gains = self.aux.data.*self.sumWidth.value.*repmat([self.auxMultipliers.value],size(self.aux.data,1),1);
+                    self.gains = self.aux.data.*self.sumWidth.value;
                     self.gains = self.gains;
                 end 
             end
