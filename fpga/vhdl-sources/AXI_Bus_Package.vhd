@@ -120,7 +120,11 @@ begin
     if bus_i.valid(1) = '0' then
         param <= bus_i.data(param'length-1 downto 0);
     else
-        bus_o.data <= (AXI_DATA_WIDTH-1 downto param'length => '0') & param;
+        if param'length >= AXI_DATA_WIDTH then
+            bus_o.data <= param(AXI_DATA_WIDTH-1 downto 0);
+        else
+            bus_o.data <= (AXI_DATA_WIDTH-1 downto param'length => '0') & param;
+        end if;
     end if;
 end rw;
 
@@ -135,7 +139,11 @@ begin
     if bus_i.valid(1) = '0' then
         param <= unsigned(bus_i.data(param'length-1 downto 0));
     else
-        bus_o.data <= (AXI_DATA_WIDTH-1 downto param'length => '0') & std_logic_vector(param);
+        if param'length >= AXI_DATA_WIDTH then
+            bus_o.data <= std_logic_vector(param(AXI_DATA_WIDTH-1 downto 0));
+        else
+            bus_o.data <= (AXI_DATA_WIDTH-1 downto param'length => '0') & std_logic_vector(param);
+        end if;
     end if;
 end rw;
 
@@ -150,7 +158,11 @@ begin
     if bus_i.valid(1) = '0' then
         param <= signed(bus_i.data(param'length-1 downto 0));
     else
-        bus_o.data <= (AXI_DATA_WIDTH-1 downto param'length => '0') & std_logic_vector(param);
+        if param'length >= AXI_DATA_WIDTH then
+            bus_o.data <= std_logic_vector(param(AXI_DATA_WIDTH-1 downto 0));
+        else
+            bus_o.data <= (AXI_DATA_WIDTH-1 downto param'length => '0') & std_logic_vector(param);
+        end if;
     end if;
 end rw;
 
@@ -165,7 +177,11 @@ begin
         bus_o.resp <= "11";
     else
         bus_o.resp <= "01";
-        bus_o.data <= (AXI_DATA_WIDTH-1 downto param'length => '0') & std_logic_vector(param);
+        if param'length >= AXI_DATA_WIDTH then
+            bus_o.data <= std_logic_vector(param(AXI_DATA_WIDTH-1 downto 0));
+        else
+            bus_o.data <= (AXI_DATA_WIDTH-1 downto param'length => '0') & std_logic_vector(param);
+        end if;
     end if;
 end readOnly;
 

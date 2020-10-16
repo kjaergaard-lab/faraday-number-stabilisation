@@ -91,14 +91,14 @@ component ComputeSignal is
         clk         :   in  std_logic;                              --Clock synchronous with data_i
         aresetn     :   in  std_logic;                              --Asynchronous reset
         
-        data_i      :   in  t_adc_integrated_array(1 downto 0);     --Input integrated data on two channels
-        valid_i     :   in  std_logic;                              --High for one cycle when data_i is valid
+        dataS_i     :   in  t_adc_integrated_array(1 downto 0);     --Input signal integrated data on two channels
+        validS_i    :   in  std_logic;                              --High for one cycle when data_i is valid
         
-        gain_i      :   in  t_gain_array(1 downto 0);               --Input gain values on two channels
-        validGain_i :   in  std_logic;                              --High for one cycle when gain_i is valid
+        dataA_i     :   in  t_adc_integrated_array(1 downto 0);     --Input auxiliary integrated data on two channels
+        validA_i    :   in  std_logic;                              --High for one cycle when data_i is valid
         
-        useFixedGain:   in  std_logic;                              --Use fixed gain multipliers
-        multipliers :   in  t_param_reg_array(1 downto 0);          --Fixed gain multipliers, 32 bits each
+        useFixedGain:   in  std_logic;                              --Use fixed gain/auxiliary values
+        fixedGains  :   in  t_param_reg_array(1 downto 0);          --The fixed gain/auxiliary values to use
         
         ratio_o     :   out signed(SIGNAL_WIDTH-1 downto 0);        --Output division signal
         valid_o     :   out std_logic                               --High for one cycle when ratio_o is valid
@@ -212,13 +212,6 @@ signal dataIntAux           :   t_adc_integrated_array(1 downto 0)  :=  (others 
 signal validIntAux          :   std_logic                       :=  '0';
 
 --
--- Gain computation signals
---
-signal gainMultipliers      :   t_param_reg                     :=  (others => '0');
-signal gain                 :   t_gain_array(1 downto 0)        :=  (others => (others => '0'));
-signal gainValid            :   std_logic                       :=  '0';
-
---
 -- Signal computation signals
 --
 signal useFixedGain         :   std_logic;
@@ -306,19 +299,19 @@ port map(
 --
 -- Compute the gain values from the auxiliary measuremnts
 --
-GainComputation: ComputeGain
-port map(
-    clk             =>  adcClk,
-    aresetn         =>  aresetn,
+--GainComputation: ComputeGain
+--port map(
+--    clk             =>  adcClk,
+--    aresetn         =>  aresetn,
     
-    data_i          =>  dataIntAux,
-    valid_i         =>  validIntAux,
+--    data_i          =>  dataIntAux,
+--    valid_i         =>  validIntAux,
 
-    multipliers     =>  gainMultipliers,
+--    multipliers     =>  gainMultipliers,
 
-    gain_o          =>  gain,
-    valid_o         =>  gainValid
-);
+--    gain_o          =>  gain,
+--    valid_o         =>  gainValid
+--);
 
 --
 -- Compute the ratio S_-/S_+
@@ -328,14 +321,14 @@ port map(
     clk             =>  adcClk,
     aresetn         =>  aresetn,
 
-    data_i          =>  dataIntSignal,
-    valid_i         =>  validIntSignal,
+    dataS_i          =>  dataIntSignal,
+    validS_i         =>  validIntSignal,
 
-    gain_i          =>  gain,
-    validGain_i     =>  gainValid,
+    dataA_i         =>  dataIntAux,
+    validA_i        =>  validIntAux,
 
     useFixedGain    =>  useFixedGain,
-    multipliers     =>  fixedGains,
+    fixedGains      =>  fixedGains,
 
     ratio_o         =>  ratio,
     valid_o         =>  ratioValid
@@ -511,7 +504,7 @@ begin
                             when X"00001C" => rw(bus_m,bus_s,comState,avgRegs(1));
                             when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(0));
                             when X"000024" => rw(bus_m,bus_s,comState,integrateRegs(1));
-                            when X"000028" => rw(bus_m,bus_s,comState,gainMultipliers);
+--                            when X"000028" => rw(bus_m,bus_s,comState,gainMultipliers);
                             when X"00002C" => rw(bus_m,bus_s,comState,fixedGains(0));
                             when X"000030" => rw(bus_m,bus_s,comState,fixedGains(1));
                             when X"000034" => rw(bus_m,bus_s,comState,fbComputeRegs(0));
