@@ -22,3 +22,34 @@ The integrated data on both the signal and auxiliary lines are then fed into the
 
 ## Feedback
 
+The `NumberStabilisation.vhd` controls the signals necessary for stabilising the number of atoms.  Input registers carry the target ratio (24 bits), the tolerance value below which feeback stops (24 bits), and the maximum number of microwave pulses (16 bits).  In addition, the microwave pulse width (16 bits) and period (32 bits) are set along with a manual number of microwave pulses (16 bits) for testing purposes.
+
+This takes in the current ratio value and a one clock-cycle active-high valid signal. When feedback is enabled (input using the `cntrl_i.enable` port), the module computes the number of microwave pulses to output using the target ratio and the current ratio as well as the maximum number of pulses.  Feedback is attempted until the current ratio value is less than the tolerance.
+
+# Communication between FPGA and operating system
+
+## Hardware description
+
+Communication between the FPGA and the Linux operating system is done through a memory-mapped AXI bus.  Available addresses range from 0x40000000 to 0x4FFFFFFF.  In reality, the AXI bus is far too complicated for the use to which it is put in this device, so we use a Xilinx AXI protocol converter to convert the AXI4 bus to an AXI4-Lite bus.  Even this is, for the most part, too complicated for what we need, so a special module called `AXI_Parse.vhd` converts the AXI4-Lite bus into a 5 signal interface with output signals `addr_o`, `dataValid_o`, and `writeData_o`, and input signals `readData_i` and `resp_i`.  The `addr_o` signal indicates the address that the OS is trying to access, relative to the starting address of 0x40000000.  `dataValid_o` is a two-bit signal where bit 0 is high for one clock cycle when `writeData_o` (the data from the OS) and `addr_o` are valid, and bit 1 indicates if it is a write operation (low) or a read operation (high).  The `readData_i` signal is the data being sent to the OS, and `resp_i` is a two-bit signal where bit 0 indicates that the transaction has completed and that `readData_i` is valid in the case of a read operation, and bit 1 is high only when an error has occurred.  Currently, errors occur only when an address is accessed that is not implemented in the main parsing process in `topmod.vhd`.
+
+To simplify the code and improve code maintenance, many of the AXI related signals and processes are packaged up in the `AXI_Bus_Package.vhd` package.  This package defines the data types `t_axi_bus_master` and `t_axi_bus_slave` which can be combined into the bus type `t_axi_bus`.  The master and slave buses are used as inputs and outputs to overloaded `rw` processes which are used for handling the reading and writing of various parameter registers in the project, uniformly implemented as 32-bit `std_logic_vector` types as the sub-type `t_param_reg` (in packaged `CustomDataTypes.vhd`).
+
+Parameter parsing is handled in the process `Parse` in the module `topmod.vhd`. This is a finite state machine with 3 states (aside from the reset state): `idle`, `processing`, and `finishing`.  When in `idle`, it waits for a AXI bus to signal that new data is available/requested.  It then moves to processing, which is a large `case` statement that sorts through different addresses to read from/write to different parameters, or read from one of the block RAMs used for storing data.  When done, it moves to the `finishing` state where it sets all single clock-cycle triggers to zero and then moves back to the `idle` state.
+
+One will note that addresses must be aligned with 4-byte boundaries, as the AXI interface assumes that 32 bits of data will be written/read at all times.  One can get around this if necessary, but it was not implemented and thus all data written to the FPGA must be 32 bits wide and addresses used for accessing memory locations in the FPGA must also be aligned with 4-byte word boundaries; i.e., the address must end in either 0, 4, 8, or C.
+
+## Software description
+
+Low-level communication with the FPGA is handled by programs written in C.  For dealing with simple parameters where we only need relatively slow read/write speeds, we use the `monitor` program that is packaged with the Red Pitaya OS.  This allows for a very simple writing to and reading from the FPGA.  One invokves it thusly
+```
+monitor <addr> <data>
+```
+where `<addr>` is the memory address to access specified as an unsigned integer, and `<data>` is the data to write, also as an unsigned integer.  If data is absent, it is considered a read operation and the current value at the specified `<addr>` is printed to the command line.  Both `<addr>` and `<data>` can be specified in hexadecimal format like so
+```
+monitor 0x40000000
+monitor 0x40000004 0x54
+```
+where the first line reads from memory address `0x40000000` and the second line writes the data `0x54` to memory address `0x40000004`.  
+
+When reading from the block RAMs we want to read a lot of data in a short amount of time.  In this case we use a custom function `fetchData` (source `fetchData.c`) to read data from the FPGA.  This program uses two arguments: the number of samples to fetch and the RAM to fetch from.  The maximum number of samples to fetch is 16384.  The `fetchType` parameter, which is the second argument, has possible values [0,4] in integer steps, with 0 and 1 fetching raw data from the signal and auxiliary lines, respectively; values 2 and 3 fetching integrated data from the signal and auxiliary lines, respectively; and value 4 fetching the computed ratio.  The raw data is 16 bits internally in the FPGA so the two channels are concatenated into a single 32 bit data word.  The integrated data is 24 bits wide, so the two channels are interleaved as separate addresses in the block RAMs and retrieved as such.  The ratio data is 16 bits wide and thus is stored as one entry per address.
+
