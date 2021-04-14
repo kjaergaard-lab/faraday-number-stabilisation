@@ -220,7 +220,7 @@ if {[string equal [get_filesets -quiet sources_1] ""]} {
 
 # Set IP repository paths
 set obj [get_filesets sources_1]
-set_property "ip_repo_paths" "[file normalize "$origin_dir/../../../FPGA/RP_FPGA/redpitaya_guide/tmp/cores"]" $obj
+set_property "ip_repo_paths" "[file normalize "$origin_dir/../../redpitaya_guide/tmp/cores"]" $obj
 
 # Rebuild user ip_repo's index before adding any source files
 update_ip_catalog -rebuild
@@ -250,7 +250,6 @@ set files [list \
  [file normalize "${origin_dir}/vhdl-sources/QuickAvg.vhd" ]\
  [file normalize "${origin_dir}/vhdl-sources/SaveADCData.vhd" ]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sources_1/new/topmod.vhd" ]\
- [file normalize "${origin_dir}/rp-feedback.srcs/sources_1/bd/system/hdl/system_wrapper.v"]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sources_1/ip/PowDivider/PowDivider.xci" ]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sources_1/new/DispersiveProbing.vhd" ]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sources_1/ip/SquareRoot48/SquareRoot48.xci" ]\
@@ -537,17 +536,17 @@ set_property -name "used_in" -value "synthesis simulation" -objects $file_obj
 set_property -name "used_in_simulation" -value "1" -objects $file_obj
 set_property -name "used_in_synthesis" -value "1" -objects $file_obj
 
-set file "hdl/system_wrapper.v"
-set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
-set_property -name "file_type" -value "Verilog" -objects $file_obj
-set_property -name "is_enabled" -value "1" -objects $file_obj
-set_property -name "is_global_include" -value "0" -objects $file_obj
-set_property -name "library" -value "xil_defaultlib" -objects $file_obj
-set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
-set_property -name "used_in" -value "synthesis implementation simulation" -objects $file_obj
-set_property -name "used_in_implementation" -value "1" -objects $file_obj
-set_property -name "used_in_simulation" -value "1" -objects $file_obj
-set_property -name "used_in_synthesis" -value "1" -objects $file_obj
+# set file "hdl/system_wrapper.v"
+# set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
+# set_property -name "file_type" -value "Verilog" -objects $file_obj
+# set_property -name "is_enabled" -value "1" -objects $file_obj
+# set_property -name "is_global_include" -value "0" -objects $file_obj
+# set_property -name "library" -value "xil_defaultlib" -objects $file_obj
+# set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
+# set_property -name "used_in" -value "synthesis implementation simulation" -objects $file_obj
+# set_property -name "used_in_implementation" -value "1" -objects $file_obj
+# set_property -name "used_in_simulation" -value "1" -objects $file_obj
+# set_property -name "used_in_synthesis" -value "1" -objects $file_obj
 
 set file "PowDivider/PowDivider.xci"
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
@@ -681,7 +680,7 @@ set_property -name "include_dirs" -value "" -objects $obj
 set_property -name "lib_map_file" -value "" -objects $obj
 set_property -name "loop_count" -value "1000" -objects $obj
 set_property -name "name" -value "sources_1" -objects $obj
-set_property -name "top" -value "system_wrapper" -objects $obj
+# set_property -name "top" -value "system_wrapper" -objects $obj
 set_property -name "verilog_define" -value "TOOL_VIVADO" -objects $obj
 set_property -name "verilog_uppercase" -value "0" -objects $obj
 set_property -name "verilog_version" -value "verilog_2001" -objects $obj
@@ -696,9 +695,9 @@ if {[string equal [get_filesets -quiet constrs_1] ""]} {
 set obj [get_filesets constrs_1]
 
 # Add/Import constrs file and set constrs file properties
-set file "[file normalize "$origin_dir/../../../FPGA/RP_FPGA/redpitaya_guide/cfg/clocks.xdc"]"
+set file "[file normalize "$origin_dir/cfg/clocks.xdc"]"
 set file_added [add_files -norecurse -fileset $obj [list $file]]
-set file "$origin_dir/../../../FPGA/RP_FPGA/redpitaya_guide/cfg/clocks.xdc"
+set file "$origin_dir/cfg/clocks.xdc"
 set file [file normalize $file]
 set file_obj [get_files -of_objects [get_filesets constrs_1] [list "*$file"]]
 set_property -name "file_type" -value "XDC" -objects $file_obj
@@ -714,9 +713,9 @@ set_property -name "used_in_implementation" -value "1" -objects $file_obj
 set_property -name "used_in_synthesis" -value "1" -objects $file_obj
 
 # Add/Import constrs file and set constrs file properties
-set file "[file normalize "$origin_dir/../../../FPGA/RP_FPGA/redpitaya_guide/cfg/ports.xdc"]"
+set file "[file normalize "$origin_dir/cfg/ports.xdc"]"
 set file_added [add_files -norecurse -fileset $obj [list $file]]
-set file "$origin_dir/../../../FPGA/RP_FPGA/redpitaya_guide/cfg/ports.xdc"
+set file "$origin_dir/cfg/ports.xdc"
 set file [file normalize $file]
 set file_obj [get_files -of_objects [get_filesets constrs_1] [list "*$file"]]
 set_property -name "file_type" -value "XDC" -objects $file_obj
@@ -744,11 +743,11 @@ if {[string equal [get_filesets -quiet sim_1] ""]} {
 }
 
 # Set 'sim_1' fileset object
-set obj [get_filesets sim_1]
-set files [list \
- [file normalize "${origin_dir}/../../../FPGA/RP_FPGA/redpitaya_guide/tmp/1_led_blink/AXI_Test_tb_behav.wcfg"] \
-]
-add_files -norecurse -fileset $obj $files
+# set obj [get_filesets sim_1]
+# set files [list \
+#  [file normalize "${origin_dir}/../../../FPGA/RP_FPGA/redpitaya_guide/tmp/1_led_blink/AXI_Test_tb_behav.wcfg"] \
+# ]
+# add_files -norecurse -fileset $obj $files
 
 # Import local files from the original project
 set files [list \
@@ -757,28 +756,24 @@ set files [list \
  [file normalize "${origin_dir}/rp-feedback.srcs/sim_1/new/Divisor_tb.vhd" ]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sim_1/new/ComputeGain_tb.vhd" ]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sim_1/new/DataAcquisition_tb.vhd" ]\
- [file normalize "${origin_dir}/rp-feedback.srcs/sim_1/new/testy_mctestface.vhd" ]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sim_1/new/DispersiveProbing_tb.vhd" ]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sim_1/new/UART_Receiver_tb.vhd" ]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sim_1/new/QuickAvg_tb.vhd" ]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sim_1/new/SaveADCTest_tb.vhd" ]\
  [file normalize "${origin_dir}/rp-feedback.srcs/sim_1/new/AXI_Test_tb.vhd"]\
- [file normalize "${origin_dir}/rp-feedback.sim/ComputeSignal_tb_behav.wcfg" ]\
- [file normalize "${origin_dir}/DispersiveProbing_tb_behav.wcfg" ]\
- [file normalize "${origin_dir}/UART_Receiver_tb_behav.wcfg" ]\
 ]
 set imported_files [import_files -fileset sim_1 $files]
 
 # Set 'sim_1' fileset file properties for remote files
-set file "$origin_dir/../../../FPGA/RP_FPGA/redpitaya_guide/tmp/1_led_blink/AXI_Test_tb_behav.wcfg"
-set file [file normalize $file]
-set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
-set_property -name "is_enabled" -value "1" -objects $file_obj
-set_property -name "is_global_include" -value "0" -objects $file_obj
-set_property -name "library" -value "xil_defaultlib" -objects $file_obj
-set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
-set_property -name "used_in" -value "simulation" -objects $file_obj
-set_property -name "used_in_simulation" -value "1" -objects $file_obj
+# set file "$origin_dir/../../../FPGA/RP_FPGA/redpitaya_guide/tmp/1_led_blink/AXI_Test_tb_behav.wcfg"
+# set file [file normalize $file]
+# set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
+# set_property -name "is_enabled" -value "1" -objects $file_obj
+# set_property -name "is_global_include" -value "0" -objects $file_obj
+# set_property -name "library" -value "xil_defaultlib" -objects $file_obj
+# set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
+# set_property -name "used_in" -value "simulation" -objects $file_obj
+# set_property -name "used_in_simulation" -value "1" -objects $file_obj
 
 
 # Set 'sim_1' fileset file properties for local files
@@ -827,17 +822,6 @@ set_property -name "used_in_simulation" -value "1" -objects $file_obj
 set_property -name "used_in_synthesis" -value "1" -objects $file_obj
 
 set file "new/DataAcquisition_tb.vhd"
-set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
-set_property -name "file_type" -value "VHDL" -objects $file_obj
-set_property -name "is_enabled" -value "1" -objects $file_obj
-set_property -name "is_global_include" -value "0" -objects $file_obj
-set_property -name "library" -value "xil_defaultlib" -objects $file_obj
-set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
-set_property -name "used_in" -value "synthesis simulation" -objects $file_obj
-set_property -name "used_in_simulation" -value "1" -objects $file_obj
-set_property -name "used_in_synthesis" -value "1" -objects $file_obj
-
-set file "new/testy_mctestface.vhd"
 set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
 set_property -name "file_type" -value "VHDL" -objects $file_obj
 set_property -name "is_enabled" -value "1" -objects $file_obj
@@ -903,32 +887,32 @@ set_property -name "used_in" -value "synthesis simulation" -objects $file_obj
 set_property -name "used_in_simulation" -value "1" -objects $file_obj
 set_property -name "used_in_synthesis" -value "1" -objects $file_obj
 
-set file "rp-feedback.sim/ComputeSignal_tb_behav.wcfg"
-set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
-set_property -name "is_enabled" -value "1" -objects $file_obj
-set_property -name "is_global_include" -value "0" -objects $file_obj
-set_property -name "library" -value "xil_defaultlib" -objects $file_obj
-set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
-set_property -name "used_in" -value "simulation" -objects $file_obj
-set_property -name "used_in_simulation" -value "1" -objects $file_obj
+# set file "rp-feedback.sim/ComputeSignal_tb_behav.wcfg"
+# set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
+# set_property -name "is_enabled" -value "1" -objects $file_obj
+# set_property -name "is_global_include" -value "0" -objects $file_obj
+# set_property -name "library" -value "xil_defaultlib" -objects $file_obj
+# set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
+# set_property -name "used_in" -value "simulation" -objects $file_obj
+# set_property -name "used_in_simulation" -value "1" -objects $file_obj
 
-set file "fpga/DispersiveProbing_tb_behav.wcfg"
-set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
-set_property -name "is_enabled" -value "1" -objects $file_obj
-set_property -name "is_global_include" -value "0" -objects $file_obj
-set_property -name "library" -value "xil_defaultlib" -objects $file_obj
-set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
-set_property -name "used_in" -value "simulation" -objects $file_obj
-set_property -name "used_in_simulation" -value "1" -objects $file_obj
+# set file "fpga/DispersiveProbing_tb_behav.wcfg"
+# set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
+# set_property -name "is_enabled" -value "1" -objects $file_obj
+# set_property -name "is_global_include" -value "0" -objects $file_obj
+# set_property -name "library" -value "xil_defaultlib" -objects $file_obj
+# set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
+# set_property -name "used_in" -value "simulation" -objects $file_obj
+# set_property -name "used_in_simulation" -value "1" -objects $file_obj
 
-set file "fpga/UART_Receiver_tb_behav.wcfg"
-set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
-set_property -name "is_enabled" -value "1" -objects $file_obj
-set_property -name "is_global_include" -value "0" -objects $file_obj
-set_property -name "library" -value "xil_defaultlib" -objects $file_obj
-set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
-set_property -name "used_in" -value "simulation" -objects $file_obj
-set_property -name "used_in_simulation" -value "1" -objects $file_obj
+# set file "fpga/UART_Receiver_tb_behav.wcfg"
+# set file_obj [get_files -of_objects [get_filesets sim_1] [list "*$file"]]
+# set_property -name "is_enabled" -value "1" -objects $file_obj
+# set_property -name "is_global_include" -value "0" -objects $file_obj
+# set_property -name "library" -value "xil_defaultlib" -objects $file_obj
+# set_property -name "path_mode" -value "RelativeFirst" -objects $file_obj
+# set_property -name "used_in" -value "simulation" -objects $file_obj
+# set_property -name "used_in_simulation" -value "1" -objects $file_obj
 
 
 # Set 'sim_1' fileset properties
