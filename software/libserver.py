@@ -64,6 +64,7 @@ class Message:
                 pass
             else:
                 self._send_buffer = self._send_buffer[sent:]    #Retains only data from index sent to end of array of bytes
+                print("Bytes sent: %d, Bytes Remaining: %d" % (sent, len(self._send_buffer)))
                 #Close when the buffer is empty - binary data is true if not empty
                 if sent and not self._send_buffer:
                     self.close()
@@ -147,8 +148,7 @@ class Message:
     
     def create_response(self):
         self.fpga_response["length"] = 4*len(self.fpga_response["data"])
-        data = self.fpga_response["data"]
-        del(self.fpga_response["data"])
+        data = self.fpga_response.pop("data")
         json_str = json.dumps(self.fpga_response)
         print(json_str)
         tmp = json_str.encode('ascii')
@@ -156,6 +156,7 @@ class Message:
         for d in data:
             # print(format(int(d,16)))
             self._send_buffer += struct.pack("<I",int(d,16))
+        self.response_created = True
         
 
             
