@@ -1,12 +1,15 @@
 classdef DPFeedbackParameter < handle
+    %DPFEEDBACKPARAMETER Defines a class representing a feedback parameter.
+    %Has limit checking abilities, can convert between physical values and
+    %integer values, and parameters can span multiple registers.
     properties
-        bits
-        upperLimit  %Upper limit on value
-        lowerLimit  %Lower limit on value
+        bits                %Bit range that parameter occupies
+        upperLimit          %Upper limit on value
+        lowerLimit          %Lower limit on value
     end
     
     properties(SetAccess = protected)
-        regs
+        regs                %Registers that the parameter spans
         value               %Human-readable value in real units
         intValue            %Integer value written for FPGA
         toIntegerFunction   %Function converting real values to integer values
@@ -15,6 +18,17 @@ classdef DPFeedbackParameter < handle
     
     methods
         function self = DPFeedbackParameter(bits,regIn)
+            %DPFEEDBACKPARAMETER Creates an instance of the
+            %DPFeedbackParameter class.
+            %
+            %   P = DPFEEDBACKPARAMETER(BITS,REGIN) Creates an instance P
+            %   with bit range BITS and registers REGIN.
+            %
+            %   If numel(REGIN) > 1, then the size of BITS is size(BITS) =
+            %   [numel(REGIN),2]
+            %
+            %   The default integer conversion functions are just a
+            %   straight mapping @(x) x
             self.bits = bits;
             self.regs = regIn;
             if size(self.bits,1) ~= numel(self.regs)
@@ -26,6 +40,11 @@ classdef DPFeedbackParameter < handle
         end
         
         function set.bits(self,bits)
+            %SET.BITS Sets the bit ranges
+            %
+            %   SET.BITS(BITS) sets the bit range to BITS where BITS must
+            %   be an Nx2 matrix where N is the number of registers. Any
+            %   value of BITS must be in the range [0,31]
             if mod(numel(bits),2)~=0 || any(bits(:)<0) || any(bits(:)>31) || size(bits,2)>2
                 error('Bits must be a 2-element vector with values in [0,31] or an Nx2 matrix with values in [0,31]');
             else
@@ -38,12 +57,23 @@ classdef DPFeedbackParameter < handle
         end
         
         function N = numbits(self)
+            %NUMBITS Returns the total number of bits occupied by this
+            %parameter
+            %
+            %   N = P.NUMBITS() returns the total number of bits N
             N = sum(abs(diff(self.bits,1,2)),1)+1;
         end
         
         function self = setFunctions(self,varargin)
             %SETFUNCTIONS Sets the toInteger and fromInteger functions for
             %converting physical values to integer values
+            %
+            %   P = P.SETFUNCTIONS(TYPE,FUNC,<TYPE2,FUNC2>) sets the
+            %   integer conversion functions with TYPE or optional TYPE2
+            %   are either 'to' or 'from'.  FUNC and optional FUNC2 are the
+            %   conversion functions converting a physical value TO an
+            %   integer value (for TYPE 'to') or FROM an integer value to a
+            %   physical value (for TYPE 'from')
             
             %Check register inputs
             if mod(numel(varargin),2)~=0
@@ -67,6 +97,11 @@ classdef DPFeedbackParameter < handle
         function self = setLimits(self,varargin)
             %SETLIMITS Sets the upper and lower limits on the physical
             %value
+            %
+            %   P = P.SETLIMITS(TYPE,LIMIT,<TYPE2,LIMIT2>) sets the limits
+            %   for parameter P.  TYPE and optional TYPE2 are one of
+            %   'upper' or 'lower', and LIMIT and optional LIMIT2 are the
+            %   upper and lower limits for their respective TYPE arguments
             
             %Check register inputs
             if mod(numel(varargin),2)~=0
@@ -86,6 +121,10 @@ classdef DPFeedbackParameter < handle
         
         function r = toInteger(obj,varargin)
             %TOINTEGER Converts the arguments to an integer
+            %
+            %   R = P.toInteger(varargin) invokes the toIntegerFunction for
+            %   parameter P to convert a physical value to an integer with
+            %   possible variable arguments.
             r = obj.toIntegerFunction(varargin{:});
             try
                 r = round(r);
@@ -96,11 +135,18 @@ classdef DPFeedbackParameter < handle
         
         function r = fromInteger(obj,varargin)
             %FROMINTEGER Converts the arguments from an integer
+            %
+            %   R = P.FROMINTEGER(varargin) invokes the fromIntegerFunction
+            %   for parameter P to convert an integer value to a physical
+            %   value with possible variable arguments.
             r = obj.fromIntegerFunction(varargin{:});
         end
         
         function self = checkLimits(self,v)
             %CHECKLIMITS Checks the limits on the set value
+            %
+            %   P = P.CHECKLIMITS(V) checks if value V is within the limits
+            %   of the parameter P
             if ~isempty(self.lowerLimit) && isnumeric(self.lowerLimit) && (v < self.lowerLimit)
                 error('Value is lower than the lower limit!');
             end
@@ -113,7 +159,13 @@ classdef DPFeedbackParameter < handle
         
         function self = set(self,v,varargin)
             %SET Sets the physical value of the parameter and converts it
-            %to an integer as well
+            %to an integer as well. Also sets the value of associated
+            %registers according to the associated bit ranges
+            %
+            %   P = P.SET(V,VARARGIN) sets the value of parameter P to V
+            %   with possible variable arguments VARARGIN for the
+            %   TOINTEGERFUNCTION function. Register values are also set in
+            %   this call
             self.checkLimits(v);
             tmp = self.toInteger(v,varargin{:});
             if log2(double(tmp)) > self.numbits
@@ -139,6 +191,10 @@ classdef DPFeedbackParameter < handle
         function r = get(self,varargin)
             %GET Gets the physical value of the parameter from the integer
             %value
+            %
+            %   R = P.GET(VARARGIN) Retrieves the physical value R from the
+            %   value contained in the stored registers using possible
+            %   variable arguments VARARGIN for FROMINTEGERFUNCTION.
             if numel(self.regs) == 1
                 self.intValue = self.regs.get(self.bits);
             else
@@ -154,10 +210,12 @@ classdef DPFeedbackParameter < handle
         end
         
         function self = read(self)
+            %READ Reads the parameter from the device
+            %
+            %   P = P.READ() Reads the value of parameter P from the device
+            %   via the register READ() functions
             if numel(self) == 1
-                for nn=1:numel(self.regs)
-                    self.regs(nn).read;
-                end
+                self.regs.read;
                 self.get;
             else
                 for nn=1:numel(self)
@@ -167,10 +225,12 @@ classdef DPFeedbackParameter < handle
         end
         
         function self = write(self)
+            %WRITE Writes the parameter to the device
+            %
+            %   P = P.WRITE() Writes the current value of the parameter
+            %   to the device via the register WRITE() functions
             if numel(self) == 1
-                for nn=1:numel(self.regs)
-                    self.regs(nn).write;
-                end
+                self.regs.write;
             else
                 for nn=1:numel(self)
                     self(nn).write;
@@ -179,6 +239,8 @@ classdef DPFeedbackParameter < handle
         end
         
         function disp(self)
+            %DISP Displays information about the current
+            %DPFeedbackParameter instance
             if numel(self) == 1
                 fprintf(1,'\t DBFeedbackParameter with properties:\n');
                 if size(self.bits,1) == 1

@@ -1,3 +1,4 @@
 *.bin
 *.asv
 __pycache__/
+*~
