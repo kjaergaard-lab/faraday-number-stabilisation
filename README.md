@@ -63,6 +63,31 @@ and it will start the socket server by determining the IP address using the `get
 
 The server works via the class `Message` defined in `libserver.py` which handles reading and writing of data to and from the TCP/IP connection, and calls the `appcontroller.py` package to communicate with the FPGA.  The server expects messages to consist of a 'proto-header', a header, and a message body.  The proto-header is 2 bytes long and tells the server how long, in bytes, the header that follows is.  The header is a JSON-formatted ASCII string which has variable fields, one of which must be 'length'.  The 'length' field tells the server how long the message body is, in bytes.  The other allowed fields for the header are 'mode', 'numFetch', and 'fetchType'.  The allowed values for 'mode' are 'write', for writing parameters; 'read', for reading parameters; and 'fetch data', for reading data from the block RAMs.  Parameters must be 4 byte values when being written, and are returned as 4 byte values.  When 'mode' is 'fetch data', the fields 'numFetch' and 'fetchType' must be populated with the number of samples to fetch from memory and the memory to access, respectively.  The allowed values for 'fetchType' are given in the previous section.
 
-Data is sent back to the client in the same form as it is received; namely, there is a 2 byte proto-header indicating the length of the following header information, followed by a message body.  The header has fields 'err', which is Boolean value indicating if there was an error; 'errMsg', which gives information about the error; and 'length', which is the length, in bytes, of the message body.
+Data is sent back to the client in the same form as it is received; namely, there is a 2 byte proto-header indicating the length of the following header information, followed by a message body.  The header has fields 'err', which is Boolean value indicating if there was an error; 'errMsg', which gives information about the error; and 'length', which is the length, in bytes, of the message body.  
 
+# Control via MATLAB
 
+A set of MATLAB classes exist to control the FPGA in addition to a MATLAB graphical user interface (GUI) for dealing with these classes.  There are four classes used for controlling the feedback design
+
+  - `DPFeedback`
+  - `DPFeedbackRegister`
+  - `DPFeedbackParameter`
+  - `DPFeedbackClient`
+
+The main class, which should be instantiated in the MATLAB workspace, is `DPFeedback`.  All parameters needed for the FPGA are contained inside the `DPFeedback` class as properties of type `DPFeedbackParameter`; however, since we read and write 32-bit *registers* to the FPGA, we also have the `DPFeedbackRegister` class.  Finally, communication with the Python socket server on the Red Pitaya is handled by the `DPFeedbackClient` class which is instantiated as the property `DPFeedback.conn`.  
+
+## DPFeedbackRegister class
+
+The `DPFeedbackRegister` class has only three properties: `addr`, `value`, and the protected property `conn`.  The property `addr` is the memory address, relative to the offset address 0x40000000, of this particular register.  It is an unsigned 32 bit integer.  The property `value` is the 32-bit unsigned integer value that is the current value of the register.  Finally, `conn` is the `DPFeedbackClient` object representing the connection with the socket server, and is the same object as the `conn` property in `DPFeedback`.  
+
+`DPFeedbackRegister` has four important methods: `set`, `get`, `write`, and `read`:
+  - `set(v,bits)` sets the `value` property in bit range `bits` to the value of `v`.  `bits` is zero-indexed, so the least-significant bit is bit 0 and the most significant bit is bit 31.  This is used to set particular bit ranges, corresponding to a particular parameter, to the desired value
+  - `get(bits)` gets the value, as an unsigned 32 bit integer, of the bit range `bits` from the property `value`.  This is used to retrieve a particular parameter form the register.
+  - `write()` writes the current value of the register to the device via the socket connection `conn`.
+  - `read()` reads the current value of the register from the device via the socket connection `conn`.
+
+## DPFeedbackParameter class
+
+The way that parameters are implemented in the design is that we write to 32 bit registers and then parameters are extracted from those registers.  Some parameters can be fully extracted from a single register, but others span multiple registers.  The `DPFeedbackParameter` class exists as the main method by which parameter values should be changed as it handles all the necessary manipulation of register values to ensure that parameters are changed in the correct way without overwriting other data.
+
+The basic idea behind the `DPFeedbackParameter` class is that we have two related values for each parameter: the physical value, which corresponds to real-world units and describes things like time delays is seconds or voltages in volts, and the integer value, which is a representation of the physical value in a way that is easy to work with in programmable logic.  The physical value can have upper and lower limits, and there are well-defined conversions between the physical and integer values.  Additionally, the parameter spans certain bit ranges inside registers, and we need to represent those, too.
