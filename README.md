@@ -118,7 +118,7 @@ fb = DPFeedback;  %Creates a DPFeedback object in your workspace
 fb.setDefaults(); %Sets the default values so that the GUI doesn't throw an error on missing values
 AppFeedbackDP(fb);%Creates the GUI
 ```
-![View of GUI](images/matlab-giu.png)
+![View of GUI](images/matlab-gui.png)
 
 The above image shows how the GUI looks when on the settings tab.  Other tabs (accessed at the top of the GUI) show the raw data, the processed data, and the ratio data.  Parameters can be entered in the relevant text fields, and the dispersive pulses, feedback, and/or manual microwvae pulses can be enabled/disabled using the checkboxes.  **Do not** use the "Signal Computation" settings as that was for a previous version of the feedback system and those functions are deprecated.  They have not been removed because of possible compatibility issues between difference MATLAB versions of their GUI editor.
 
