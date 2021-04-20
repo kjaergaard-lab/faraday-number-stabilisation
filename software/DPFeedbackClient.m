@@ -1,25 +1,34 @@
 classdef DPFeedbackClient < handle
+    %DPFeedbackClient Defines a class for handling client-side
+    %communication with a server via the TCP/IP protocol
     properties
-        client
-        host
+        client  %Client tcpip() object
+        host    %Address of the socket server to connect to 
     end
     
     properties(SetAccess = protected)
-        headerLength
-        header
-        recvMessage
-        recvDone
-        bytesRead
+        headerLength    %Length of message header in bytes
+        header          %Actual header
+        recvMessage     %Received message
+        recvDone        %Flag indicating that message has been received in its entirety
+        bytesRead       %Number of bytes read from the server
     end
     
     properties(Constant)
-        TCP_PORT = 6666;
-%         HOST_ADDRESS = '127.0.0.1';
-        HOST_ADDRESS = '172.22.250.94';
+        TCP_PORT = 6666;                %TCP Port to use
+        HOST_ADDRESS = '172.22.250.94'; %Default server IP address
     end
     
     methods
-        function self = PhaseLockClient(host)
+        function self = DPFeedbackClient(host)
+            %DPFEEDBACKCLIENT Creates an instance of the object with
+            %default host address
+            %
+            %   CONN = DPFEEDBACKCLIENT() Creates an instance of the object
+            %   with the default host address
+            %
+            %   CONN = DPFEEDBACKCLIENT(HOST) creates an instance with the
+            %   specified IP address/server name HOST
             if nargin==1
                 self.host = host;
             else
@@ -29,7 +38,7 @@ classdef DPFeedbackClient < handle
         end
         
         function open(self)
-%             self.client = tcpclient(self.host,self.TCP_PORT,'Timeout',5,'ConnectTimeout',5);
+            %OPEN Creates and opens a TCP/IP connection
             r = instrfindall('RemoteHost',self.host,'RemotePort',self.TCP_PORT);
             if isempty(r)
                 self.client = tcpip(self.host,self.TCP_PORT,'byteOrder','littleEndian');
@@ -46,6 +55,8 @@ classdef DPFeedbackClient < handle
         end
         
         function close(self)
+            %CLOSE Closes and deletes the TCP/IP object associated with
+            %this instance
             if ~isempty(self.client) && isvalid(self.client) && strcmpi(self.client,'open')
                 fclose(self.client);
             end
@@ -54,6 +65,8 @@ classdef DPFeedbackClient < handle
         end
         
         function delete(self)
+            %DELETE Deletes this object by first closing the TCP/IP
+            %connection
             try
                 self.close;
             catch
@@ -62,6 +75,7 @@ classdef DPFeedbackClient < handle
         end
         
         function initRead(self)
+            %INITREAD Initializes the reception of messages from the server
             self.headerLength = [];
             self.header = [];
             self.recvMessage = [];
@@ -70,30 +84,50 @@ classdef DPFeedbackClient < handle
         end
         
         function self = write(self,data,varargin)
+            %WRITE Writes data to the server
+            %
+            %   FB = FB.WRITE(DATA,NAME1,VALUE1,NAME2,VALUE2,...) writes
+            %   DATA to the server with message header fields given by
+            %   (NAME1,VALUE1), (NAME2,VALUE2), etc.  The message header is
+            %   converted into a JSON formatted string before being sent,
+            %   and the DATA is converted into an array of uint8 integers
+            %
+            %   WRITE expects a reply and will wait for up to 20 s for a
+            %   reply
+            
             if mod(numel(varargin),2)~=0
                 error('Variable arguments must be in name/value pairs');
             end
+            %If no data is provided, write a zero to the server as it
+            %expects some data
             if numel(data) == 0
                 data = 0;
             end
+            %Open the connection
             self.open;
+            
             try
+                %Create message header MSG
                 msg.length = numel(data);
-
                 for nn=1:2:numel(varargin)
                     msg.(varargin{nn}) = varargin{nn+1};
                 end
 
-                self.initRead;
-                msg = jsonencode(msg);
-                len = uint16(numel(msg));
+                self.initRead;              %Reset the read variables
+                msg = jsonencode(msg);      %Encode the header as a JSON string
+                len = uint16(numel(msg));   %Determine the header length
 
+                %Send the message as header length (2 bytes), header, data
                 msg_write = [typecast(len,'uint8'),uint8(msg),typecast(uint32(data),'uint8')];
                 fwrite(self.client,msg_write,'uint8');
                 
+                %Hacked-together read process that has a well-defined
+                %timeout of 20 s. Exits when recvDone flag is true
                 jj = 1;
                 while ~self.recvDone
-                    self.read;
+                    self.read;      %This does the actual processing of the message
+                    %The rest of this while loop waits for at most 20 s
+                    %before throwing an error
                     pause(10e-3);
                     if jj>2e3
                         error('Timeout reading data');
@@ -109,14 +143,20 @@ classdef DPFeedbackClient < handle
         end
         
         function read(self)
+            %READ Reads a reply from the server
+            
+            %If header length is unknown, get it from the message
             if isempty(self.headerLength)
                 self.processProtoHeader();
             end
             
+            %If the header is empty, get it from the message
             if isempty(self.header)
                 self.processHeader();
             end
             
+            %If there should be data, and we have not finished reading the
+            %message, retrieve the data from the message
             if isfield(self.header,'length') && ~self.recvDone
                 self.processMessage();
             end
@@ -125,12 +165,19 @@ classdef DPFeedbackClient < handle
     
     methods(Access = protected)       
         function processProtoHeader(self)
+            %PROCESSPROTOHEADER Retrieves the header length from the first
+            %two bytes of the message
             if self.client.BytesAvailable>=2
                 self.headerLength = fread(self.client,1,'uint16');
             end
         end
         
         function processHeader(self)
+            %PROCESSHEADER Retrieves the header from the message based on
+            %the header length acquired from PROCESSPROTOHEADER.
+            %
+            %   The header is assumed to be a JSON formatted character
+            %   vector
             if self.client.BytesAvailable>=self.headerLength
                 tmp = fread(self.client,self.headerLength,'uint8');
                 self.header = jsondecode(char(tmp)');
@@ -141,6 +188,9 @@ classdef DPFeedbackClient < handle
         end
         
         function processMessage(self)
+            %PROCESSMESSAGE Retrieves the message data from the message
+            %based on the header, specifically the "length" field in the
+            %header
             if self.bytesRead < self.header.length
                 bytesToRead = self.client.BytesAvailable;
 %                 fprintf(1,'Bytes to read: %d\n',bytesToRead);

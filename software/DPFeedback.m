@@ -1,86 +1,95 @@
 classdef DPFeedback < handle
+    %DPFEEDBACK Defines a class for handling control of the dispersive
+    %feedback design
     properties
-        signal
-        aux
+        signal              %An instance of DPFeedbackData representing signal data
+        aux                 %An instance of DPFeedbackData representing auxiliary data
         
-        gains
-        sum
-        diff
-        ratio
-        t
+        gains               %DEPRECATED
+        sum                 %Calculated SxSy' - Sx'Sy data
+        diff                %Calculated SxSy' + Sx'Sy data
+        ratio               %Retrieved ratio data
+        t                   %Time data for the ratio data
     end
     
     properties(SetAccess = immutable)
-        conn
+        conn                %Instance of DPFeedbackClient used for communication with socket server
         
-        enableDP
-        enableFB
-        useFixedGain
-        enableManualMW
-        dpOnShutterOff
-        auxOnShutterOff
+        enableDP            %Enables dispersive pulses
+        enableFB            %Enables number feedback using microwaves
+        useFixedGain        %DEPRECATED
+        enableManualMW      %Enables the use of manual microwave pulses
+        dpOnShutterOff      %Keeps the signal AOM on when the shutter closes
+        auxOnShutterOff     %Keeps the auxiliary AOM on when the shutter closes
         
-        width
-        numpulses
-        period
-        shutterDelay
-        auxDelay
+        width               %Dispersive pulse width
+        numpulses           %Number of dispersive pulses
+        period              %Dispersive pulse period
+        shutterDelay        %Delay between when the trigger is registered and signal pulses start
+        auxDelay            %Delay between when the trigger is registered and auxiliary pulses start
         
-        delaySignal
-        delayAux
-        samplesPerPulse
-        log2Avgs
+        delaySignal         %Delay between when a signal pulse is generated and data is acquired
+        delayAux            %Delay between when an auxiliary pulse is generated and data is acquired
+        samplesPerPulse     %Number of samples to acquire per pulse
+        log2Avgs            %Log2(number of averages to use in quickly averaging signals)
         
-        sumStart
-        subStart
-        sumWidth
-        offsets
-        usePresetOffsets
+        sumStart            %Sample at which to start summing data
+        subStart            %Sample at which to start subtracting data
+        sumWidth            %Number of samples to use for summation/subtraction
+        offsets             %Offset values to use instead of using the data
+        usePresetOffsets    %Use present offests (above) or subtract offsets using data when no light is present?
         
-        auxMultipliers
-        presetGains
+        auxMultipliers      %DEPRECATED
+        presetGains         %DEPRECATED
         
-        maxMWPulses
-        target
-        tol
+        maxMWPulses         %Maximum number of microwave pulses to use for each round of feedback
+        target              %Target ratio value for feedback
+        tol                 %Tolerance value below which feedback stops
         
-        mwNumPulses
-        mwPulseWidth
-        mwPulsePeriod
+        mwNumPulses         %Manual number of microwave pulses
+        mwPulseWidth        %Pulse width for microwave pulses
+        mwPulsePeriod       %Pulse period for microwave pulses
         
-        samplesCollected
-        pulsesCollected
+        samplesCollected    %Read-only parameter indicating number of raw samples collected. Array of 2 elements
+        pulsesCollected     %Read-only parameter indicating number of pulses collected. Array of 3 elements
         
-        manualFlag
-        pulseDPMan
-        shutterDPMan
-        pulseMWMan
-        auxMan
+        manualFlag          %Enables manual control for testing
+        pulseDPMan          %Turns the signal pulse on/off
+        shutterDPMan        %Turns the shutter on/off
+        pulseMWMan          %Turns the microwave pulse on/off
+        auxMan              %Turns the auxiliary pulse on/off
     end
     
     properties(SetAccess = protected)
-        trigReg
-        sharedReg
-        pulseRegs
-        avgRegs
-        integrateRegs
-        gainComputeReg
-        signalComputeRegs
-        fbComputeRegs
-        fbPulseRegs
+        trigReg             %Register for software trigger signals
+        sharedReg           %Register for shared top-level parameters
+        pulseRegs           %Registers for pulse parameters
+        avgRegs             %Registers for computing quick averages
+        integrateRegs       %Registers for integrating data
+        gainComputeReg      %DEPRECATED
+        signalComputeRegs   %Register for computing ratio value
+        fbComputeRegs       %Register for handling feedback computation
+        fbPulseRegs         %Register for microwave feedback pulse parameters
         
-        sampleRegs
-        pulsesRegs
+        sampleRegs          %Registers for determining number of raw samples collected
+        pulsesRegs          %Registers for determining number of pulses collected
     end
     
     properties(Constant)
-        CLK = 125e6;
-        MAX_SUM_RANGE = 2^11-1;
-        HOST_ADDRESS = '172.22.250.94';
+        CLK = 125e6;                    %Clock frequency of the board
+        MAX_SUM_RANGE = 2^11-1;         %Maximum number of points for integration
+        HOST_ADDRESS = '172.22.250.94'; %Default socket server address
     end
     
     methods
         function self = DPFeedback(varargin)
+            %DPFEEDBACK Creates an instance of a DPFeedback object.  Sets
+            %up the registers and parameters as instances of the correct
+            %classes with the necessary
+            %addressses/registers/limits/functions
+            %
+            %   FB = DPFEEDBACK(HOST) creates an instance with socket
+            %   server host address HOST
             if numel(varargin)==1
                 self.conn = DPFeedbackClient(varargin{1});
             else
@@ -247,7 +256,9 @@ classdef DPFeedback < handle
         end
         
         function self = setDefaults(self,varargin)
-            
+            %SETDEFAULTS Sets parameter values to their defaults
+            %
+            %   FB = FB.SETDEFAULTS() sets default values for FB
             self.enableDP.set(1);
             self.enableFB.set(0);
             self.useFixedGain.set(0);
@@ -300,6 +311,8 @@ classdef DPFeedback < handle
         end
         
         function self = check(self)
+            %CHECK Checks parameter values and makes sure that they are
+            %within acceptable ranges.  Throws errors if they are not
             if self.width.get >= self.period.get
                 error('Dispersive pulse width should be less than dispersive pulse period');
             end
@@ -320,13 +333,15 @@ classdef DPFeedback < handle
             
             if self.mwPulseWidth.get >= self.mwPulsePeriod.get
                 error('Microwave pulse width should be less than microwave pulse period');
-%             elseif self.quadTol.value <= self.quadTarget.value
-%                 error('Target signal times the FB number of pulses should be larger than the quad tolerance');
             end
 
         end
         
         function self = upload(self)
+            %UPLOAD Uploads register values to the device
+            %
+            %   FB = FB.UPLOAD() uploads register values associated with
+            %   object FB
             self.check;
             self.sharedReg.write;
             self.pulseRegs.write;
@@ -339,6 +354,10 @@ classdef DPFeedback < handle
         end
         
         function self = fetch(self)
+            %FETCH Retrieves parameter values from the device
+            %
+            %   FB = FB.FETCH() retrieves values and stores them in object
+            %   FB
             %Read registers
             self.sharedReg.read;
             self.pulseRegs.read;
@@ -405,15 +424,29 @@ classdef DPFeedback < handle
         end
         
         function self = start(self)
+            %START Sends a software-based start trigger to the device
+            %
+            %   FB = FB.START() sends a start trigger associated with
+            %   object FB
             self.trigReg.set(1,[0,0]).write;
             self.trigReg.set(0,[0,0]);
         end
         
         function self = reset(self)
+            %RESET Resets the device
+            %
+            %   FB = FB.RESET() resets the device associated with object FB
             self.trigReg.set(0,[0,0]).write;
         end
         
         function self = getRaw(self,qq)
+            %GETRAW Retrieves raw data from device
+            %
+            %   FB = FB.GETRAW() retrieves raw data from both signal and
+            %   auxiliary paths
+            %
+            %   FB = FB.GETRAW(Q) retrieves raw data from either signal (Q
+            %   = 1) or auxiliary (Q = 2) paths
             if nargin == 1
                 self.getRaw(1);
                 self.getRaw(2);
@@ -450,6 +483,13 @@ classdef DPFeedback < handle
         end
         
         function self = getProcessed(self,qq)
+            %GETPROCESSED Retrieves processed (integrated) data from device
+            %
+            %   FB = FB.GETPROCESSED() retrieves processed data from both
+            %   signal and auxiliary paths
+            %
+            %   FB = FB.GETPROCESSED(Q) retrieves processed data from
+            %   either signal (Q = 1) or auxiliary (Q = 2) paths
             if nargin == 1
                 self.getProcessed(1);
                 self.getProcessed(2);
@@ -477,6 +517,14 @@ classdef DPFeedback < handle
         end
         
         function self = calcRatio(self,method)
+            %CALCRATIO Calculates the ratio value from the processed data
+            %
+            %   FB = FB.CALCRATIO() Calculates the ratio value from
+            %   processed data by converting data to floating point values
+            %
+            %   FB = FB.CALCRATIO(METHOD) calculates the ratio value from
+            %   the processed data using METHOD, which is either "float" or
+            %   "int"
             if nargin == 1
                 method = 'float';
             elseif ~strcmpi(method,'int') && ~strcmpi(method,'float')
@@ -511,6 +559,10 @@ classdef DPFeedback < handle
         end
         
         function self = getRatio(self)
+            %GETRATIO Retrieves ratio values from the device
+            %
+            %   FB = FB.GETRATIO() retrieves the ratio values from the
+            %   device associated with FB
             self.pulsesCollected(3).read;
             self.conn.write(0,'mode','fetch data','fetchType',4,'numFetch',self.pulsesCollected(3).value);
             rawData = typecast(self.conn.recvMessage,'uint8');
@@ -527,14 +579,8 @@ classdef DPFeedback < handle
             self.t = self.period.value*(0:(self.pulsesCollected(3).value-1))';
         end
         
-%         function v = integrate(self)
-%             sumidx = (self.sumStart.get):(self.sumStart.get+self.sumWidth.get);
-%             subidx = (self.subStart.get):(self.subStart.get+self.sumWidth.get);
-%             v(:,1) = sum(self.rawI(sumidx,:),1)'-sum(self.rawI(subidx,:),1)';
-%             v(:,2) = sum(self.rawQ(sumidx,:),1)'-sum(self.rawQ(subidx,:),1)';
-%         end
-        
         function disp(self)
+            %DISP Displays information about the object
             strwidth = 36;
             fprintf(1,'DPFeedback object with properties:\n');
             fprintf(1,'\t Registers\n');

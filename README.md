@@ -90,4 +90,77 @@ The `DPFeedbackRegister` class has only three properties: `addr`, `value`, and t
 
 The way that parameters are implemented in the design is that we write to 32 bit registers and then parameters are extracted from those registers.  Some parameters can be fully extracted from a single register, but others span multiple registers.  The `DPFeedbackParameter` class exists as the main method by which parameter values should be changed as it handles all the necessary manipulation of register values to ensure that parameters are changed in the correct way without overwriting other data.
 
-The basic idea behind the `DPFeedbackParameter` class is that we have two related values for each parameter: the physical value, which corresponds to real-world units and describes things like time delays is seconds or voltages in volts, and the integer value, which is a representation of the physical value in a way that is easy to work with in programmable logic.  The physical value can have upper and lower limits, and there are well-defined conversions between the physical and integer values.  Additionally, the parameter spans certain bit ranges inside registers, and we need to represent those, too.
+The basic idea behind the `DPFeedbackParameter` class is that we have two related values for each parameter: the physical value, which corresponds to real-world units and describes things like time delays in seconds or voltages in volts, and the integer value, which is a representation of the physical value in a way that is easy to work with in programmable logic.  The physical value can have upper and lower limits, and there are well-defined conversions between the physical and integer values.  Additionally, the parameter spans certain bit ranges inside registers, and we need to represent those, too.
+
+The limits for the parameter can be set using the `setLimits('lower',lowerLimit,'upper',upperLimit)` method where `lowerLimit` and `upperLimit` are the lower and upper limits.  The integer conversion functions can be set using the `setFunctions('to',toFunction,'upper',upperFunction)` with `toFunction` the function handle converting from the physical value to the integer value, and the 'fromFunction' is the function handle converting from the integer value to the physical value.
+
+The current parameter value can be set using the `set(value)` method where `value` is the physical value to set.  This method handles the conversion to integer and writes this integer value to the relevant `DPFeedbackRegister`.  Call `write()` afterwards to write the value to the FPGA via the socket server.  Since the `set` method returns the current object, you can chain the calls together as `set(value).write()`.
+
+The current value of the parameter can be retrieved from the FPGA using the `read()` method.  This reads the relevant registers from the FPGA, and then extracts the current integer value from those registers and stores it in the instance of `DPFeedbackParameter`.  Use the `get()` method to retrieve the physical value.
+
+
+## DPFeedback
+
+This is the main feedback-related class and contains within it instances of the previously mentioned classes.  In addition to properties related to the parameters that can be set on the device, there are properties related to the data that can be retrieved from the device.  Users should look at the definition of `DPFeedback` for an exhaustive list of device parameters.  The important data properties are
+  - `signal`
+  - `aux`
+  - `ratio`
+  - `t`
+where `signal` and `aux` are instances of `DPFeedbackData` which has properties `rawX`, `rawY`, and `tSample`, which are for the raw, unprocessed data, and `data` and `t` for the processed (integrated) data.  The property `ratio` is the ratio value, and `t` is the time vector associated with `ratio`.
+
+Important methods for the device are `upload()`, `fetch()`, `getRaw()`, `getProcessed()`, and `getRatio()`.  `upload()` uploads all current register values to the device, while `fetch()` retrieves all register values and converts them into parameter values.  `getRaw()` retrieves the raw ADC data from the device for both the signal and auxiliary lines.  `getProcessed()` retrieves the processed data for both signal and auxiliary lines, while `getRatio` retrieves the calculated ratio value from the device.
+
+# MATLAB Graphical User Interface
+
+A graphical user interface (GUI) was made to faciliate using the MATLAB classes.  I suggest invoking it by using the commands
+```
+fb = DPFeedback;  %Creates a DPFeedback object in your workspace
+fb.setDefaults(); %Sets the default values so that the GUI doesn't throw an error on missing values
+AppFeedbackDP(fb);%Creates the GUI
+```
+![View of GUI](images/matlab-giu.png)
+
+The above image shows how the GUI looks when on the settings tab.  Other tabs (accessed at the top of the GUI) show the raw data, the processed data, and the ratio data.  Parameters can be entered in the relevant text fields, and the dispersive pulses, feedback, and/or manual microwvae pulses can be enabled/disabled using the checkboxes.  **Do not** use the "Signal Computation" settings as that was for a previous version of the feedback system and those functions are deprecated.  They have not been removed because of possible compatibility issues between difference MATLAB versions of their GUI editor.
+
+Once settings have been input, they can be uploaded to the device by clicking on the "Upload" button.  Similarly, current device settings can be retrieved using the "Fetch" button.  Data can be retrieved using the "Fetch Data" button; the device can be reset using "Reset"; and a start trigger can be sent using "Start".  
+
+Signals can be controlled manually by toggling the "Use Manual Values" button and then toggling the buttons below that one.  "Signal" turns the signal pulse output on/off; similarly for "Shutter", "MW Pulse", and "Aux".
+
+Below is a description of various parameters and how to set them.
+
+## Dispersive Pulse Settings
+
+  - *Pulse width*: the width of the signal and auxiliary pulses in seconds.  This obviously needs to be less than the next parameter, *pulse width*.
+  - *Pulse period*: the spacing between subsequent signal (and auxiliary) pulses in seconds.
+  - *Number of pulses*: The number of pulses to output.  When feedback is disabled, all pulses are generated.  When feedback is enabled, fewer pulses may be generated if feedback terminates the pulse sequence.  Up to 65535 pulses can be generated.
+  - *Shutter delay*: the delay, in seconds, between the receipt of the start trigger and when rising edge of the first signal pulse.  The shutter output signal goes high immediately on receipt of the start trigger, whether software generated or external.  If you aren't using the shutter then you should set this to 0
+  - *Aux delay*: the delay, in seconds, between the receipt of the start trigger and the rising edge of the first auxiliary pulse.  This needs to be different than the shutter delay so that signal and auxiliary pulses are interleaved in time.  
+
+## Sampling Settings
+  - *Signal Acq Delay*: Delay, in seconds, between the rising edge of the signal pulse and when data starts to be acquired for the signal line.  This is needed to account for propagation delays between the Red Pitaya and when the optical signal actually changes.  Use this to reduce the number of samples per pulse to acquire.
+  - *Aux Acq Delay*: Delay, in seconds, between the rising edge of the auxiliary pulse and when the data starts to be acquired for the auxiliary line.  This may be different than the signal acquisition delay (above).
+  - *Samples per pulse*: The number of samples to acquire for each pulse, expressed after the quick averaging module.  If you look at the raw data after acquiring data, this will be the length of each pulse record.
+  - *Log2 # Of Avgs*: The logarithm (base 2) of the number of averages for the quick averaging module.  Decreases the effective sampling rate and this is reflected in *Effective sampling rate* display on the top-right of the GUI.  Values of 3-4 are usually a pretty good bet.
+  - *Start of summation*: the sample at which summation (integration) of the data should start.
+  - *Start of subtraction*: the sample at which subtraction of the background value should start.
+  - *Sum/Sub width*: the width of the summation and subtraction regions.  The regions have to be non-overlapping, and `subStart + width` has to be less than the number of samples per pulse.  This width should encompass where the measured voltage from the optical signal is mostly flat.  When these parameters are set, and you have raw data to display on the "Raw Data" tab, these regions will be displayed as thick black dashed lines, and you can adjust them as necessary to get the right summation and subtraction ranges.
+  - *Use Preset Offsets*: Enable to only calculate the sum, and then subtract the preset offsets from the summed data.  This may be useful if you want to acquire data very fast, since the summation *and* subtraction takes about twice as long as just integrating over the region with signal.  Technically, for a stable offset this will be less noisy by a factor of sqrt(2).  I have not tried this yet, and for feedback I recommend leaving preset offests disabled.
+  - *Offset 1/Offset 2*: the preset offsets to use.
+
+## Microwave Settings
+  - *Manual # MW Pulses*: If the checkbox *Enable Manual MW Pulses* is enabled on the top-left of the GUI, this tells the device how many microwave pulses to generate.  Up to 65535 microwave pulses.  Use this to determine the fraction of atoms that each microwave pulse removes (on average).
+  - *Microwave Pulse Width*: The width, in seconds, of each microwave pulse.  2 us seems to be a good value.
+  - *Microwave Pulse Period*: The period, in seconds, of the microwave pulse train.  10 us to 20 us seems to work well, although the fraction of atoms removed is not particularly sensitive to the period.
+
+## Feedback Settings
+  - *Max # MW Pulses*: The maximum number of microwave pulses to apply, equivalent to bf^{-1} in the paper.  Keep in mind that when feedback is enabled, the dispsersive pulse period has to be longer than the maximum number of microwave pulses times the microwave pulse period, because otherwise the microwaves won't finish before the next probe pulse.
+  - *Target Signal*: The target ratio value for feedback.  While the ratio signal that is returned may be a negative, this target value is always positive and the FPGA calculates the absolute value of the ratio value before using it for feedback.
+  - *Signal Tolerance*: The tolerance value for feedback, which is defined as the value `tol` where feedback terminates if the current ratio `R` is `R < (1 + tol)*R_{target}`.  **Note** that when setting this value sometimes it gets screwed up.  Check that it set correctly by uploading then fetching parameters using the "Upload" and "Fetch" buttons and making sure that the returned value is close (within the precision of the device) to the value you set.
+
+## Calculated Values
+  - *Effective Sampling Rate*: Display only, shows the effective sampling rate in Hz after quick averaging.
+  - *# Samples Pulse Width*: Display only, shows the number of samples that the signal should be on for.
+  - *# Samples Pulse Period*: Display only, shows the number of samples that a signal period occupies.
+
+## Read-only
+These displays show the number of samples, pulses, auxiliary pulses, and ratios collected.
