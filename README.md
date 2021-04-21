@@ -6,6 +6,37 @@ In ultracold atomic physics experiments, the number of atoms in a sample of atom
 
 This repository consists of the VHDL source code, as well as a TCL script, for building the FPGA architecture which acquires and processes the APD signals, pulses on the microwave control, and handles the feedback algorithm.  To make it easier to use, a suite of MATLAB classes has been developed that allows for control of the FPGA, and much of this control can be handled via a MATLAB GUI.  Communication between MATLAB and the FPGA is done through the TCP/IP protocol with a Python-based socket server running on the Red Pitaya.  Through this combination of MATLAB and Python, parameters related to the acquisition and feedback can be set, and data from the FPGA can retrieved.
 
+# Setting up the system
+
+The outputs from whatever photodetectors that are used should be connected to the ADC inputs using the SMA connectors on the board.  Depending on the expected voltage level you should set the jumpers to either LV (+/- 1 V) or HV (+/- 20 V).  Control of pulses is done via the expansion header "E1" which is the header next to the SMA connector labelled "OUT2".  Below is a pinout diagram, also found [at the Red Pitaya website](https://redpitaya.readthedocs.io/en/latest/developerGuide/125-14/extent.html).  
+
+![Red Pitaya pinout](images/red-pitaya-connections.png)
+
+Pins with the suffix P are outputs in this design, and pins with suffix N are inputs.  Connect input DIO0_N (on the linked diagram) to the external start trigger.  Connect output pins as follows
+  - DIO0_P: "signal" pulse out. I used this for the dispersive probing laser AOM
+  - DIO1_P: shutter signal out.  Connect this to a shutter driver (if using)
+  - DIO2_P: microwave pulse out.  Connect to an appropriate microwave switch
+  - DIO4_P: "auxiliary" pulse out. I connected this to the repump AOM via an external OR gate with the signal coming from the imaging controller FPGA.
+  
+With the connections done, you need to make sure that the FPGA has the write configuration.  Make sure that the Red Pitaya is connected to the lab network, and then connect to it using SSH (via PuTTY on Windows).  The address is rp-{MAC}.local or rp-{MAC}.px.otago.ac.nz where {MAC} is the last 6 hexadecimal characters in the Red Pitaya's MAC address.  It's written on the ethernet connector on the board.  User name is "root" and password is also "root".  Navigate to correct folder (should be obvious) and then load the configuration by running
+```
+cat system_wrapper.bit > /dev/xdevcfg
+```
+Once that is done, spin up the [Python socket server](#python-server) using
+```
+python3 appserver.py
+```
+You can stop the server by using a keyboard interrupt Cntrl-C.  
+
+To get the MATLAB graphical user interface running, make sure that you are in the "software" folder and then run the following commands in the command line
+```
+fb = DPFeedback;  %Creates a DPFeedback object in your workspace
+fb.setDefaults(); %Sets the default values so that the GUI doesn't throw an error on missing values
+AppFeedbackDP(fb);%Creates the GUI
+```
+
+If you want to skip to using the GUI without reading about the FPGA architecture and other software, click [here](#matlab-control) to read about the MATLAB classes used for control or [here](#matlab-gui) for the description of the graphical user interface.
+
 # Overview of FPGA behaviour
 
 The Red Pitaya (RP) expects to have its ADCs connected to the APDs measuring the ouput signals of the polarimeter.  Furthermore, the RP needs to have a rising-edge trigger signal connected to the first pin on the `ext_i` bus, and the output pulse signals associated with lasers L and L' (the so-called 'signal' and 'auxiliary' lines) need to be connected to their respective AOMs.  A shutter output signal is also available if needed.  Finally, there is a microwave output signal that needs to be connected to an appropriate microwave switch.
@@ -53,7 +84,7 @@ where the first line reads from memory address `0x40000000` and the second line 
 
 When reading from the block RAMs we want to read a lot of data in a short amount of time.  In this case we use a custom function `fetchData` (source `fetchData.c`) to read data from the FPGA.  This program uses two arguments: the number of samples to fetch and the RAM to fetch from.  The maximum number of samples to fetch is 16384.  The `fetchType` parameter, which is the second argument, has possible values [0,4] in integer steps, with 0 and 1 fetching raw data from the signal and auxiliary lines, respectively; values 2 and 3 fetching integrated data from the signal and auxiliary lines, respectively; and value 4 fetching the computed ratio.  The raw data is 16 bits internally in the FPGA so the two channels are concatenated into a single 32 bit data word.  The integrated data is 24 bits wide, so the two channels are interleaved as separate addresses in the block RAMs and retrieved as such.  The ratio data is 16 bits wide and thus is stored as one entry per address.
 
-## Communication with a remote computer
+## <a href="python-server"></a> Communication with a remote computer
 
 While the FPGA can be controlled via the command line while logged into the Red Pitaya using a shell or equivalent program such as PuTTY, it can be useful to control the device from a remote computer using a scripting language that has in-built data analysis and visualization capabilities such as Python or MATLAB.  To that end, a socket server has been implemented in Python that can read/write parameters to the device and fetch data.  The server can be started using the command
 ```
@@ -65,7 +96,7 @@ The server works via the class `Message` defined in `libserver.py` which handles
 
 Data is sent back to the client in the same form as it is received; namely, there is a 2 byte proto-header indicating the length of the following header information, followed by a message body.  The header has fields 'err', which is Boolean value indicating if there was an error; 'errMsg', which gives information about the error; and 'length', which is the length, in bytes, of the message body.  
 
-# Control via MATLAB
+# <a href="matlab-control"></a> Control via MATLAB
 
 A set of MATLAB classes exist to control the FPGA in addition to a MATLAB graphical user interface (GUI) for dealing with these classes.  There are four classes used for controlling the feedback design
 
@@ -110,7 +141,7 @@ where `signal` and `aux` are instances of `DPFeedbackData` which has properties 
 
 Important methods for the device are `upload()`, `fetch()`, `getRaw()`, `getProcessed()`, and `getRatio()`.  `upload()` uploads all current register values to the device, while `fetch()` retrieves all register values and converts them into parameter values.  `getRaw()` retrieves the raw ADC data from the device for both the signal and auxiliary lines.  `getProcessed()` retrieves the processed data for both signal and auxiliary lines, while `getRatio` retrieves the calculated ratio value from the device.
 
-# MATLAB Graphical User Interface
+# <a href="matlab-gui"></a> MATLAB Graphical User Interface
 
 A graphical user interface (GUI) was made to faciliate using the MATLAB classes.  I suggest invoking it by using the commands
 ```
@@ -120,7 +151,7 @@ AppFeedbackDP(fb);%Creates the GUI
 ```
 ![View of GUI](images/matlab-gui.png)
 
-The above image shows how the GUI looks when on the settings tab.  Other tabs (accessed at the top of the GUI) show the raw data, the processed data, and the ratio data.  Parameters can be entered in the relevant text fields, and the dispersive pulses, feedback, and/or manual microwvae pulses can be enabled/disabled using the checkboxes.  **Do not** use the "Signal Computation" settings as that was for a previous version of the feedback system and those functions are deprecated.  They have not been removed because of possible compatibility issues between difference MATLAB versions of their GUI editor.
+The above image shows how the GUI looks when on the settings tab, and the parameters are those that were used for feedback.  Other tabs (accessed at the top of the GUI) show the raw data, the processed data, and the ratio data.  Parameters can be entered in the relevant text fields, and the dispersive pulses, feedback, and/or manual microwvae pulses can be enabled/disabled using the checkboxes.  **Do not** use the "Signal Computation" settings as that was for a previous version of the feedback system and those functions are deprecated.  They have not been removed because of possible compatibility issues between difference MATLAB versions of their GUI editor.
 
 Once settings have been input, they can be uploaded to the device by clicking on the "Upload" button.  Similarly, current device settings can be retrieved using the "Fetch" button.  Data can be retrieved using the "Fetch Data" button; the device can be reset using "Reset"; and a start trigger can be sent using "Start".  
 
