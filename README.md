@@ -22,7 +22,7 @@ With the connections done, you need to make sure that the FPGA has the write con
 ```
 cat system_wrapper.bit > /dev/xdevcfg
 ```
-Once that is done, spin up the [Python socket server](#python-server) using
+Once that is done, spin up the [Python socket server](#communication-with-a-remote-computer) using
 ```
 python3 appserver.py
 ```
@@ -35,7 +35,7 @@ fb.setDefaults(); %Sets the default values so that the GUI doesn't throw an erro
 AppFeedbackDP(fb);%Creates the GUI
 ```
 
-If you want to skip to using the GUI without reading about the FPGA architecture and other software, click [here](#matlab-control) to read about the MATLAB classes used for control or [here](#matlab-gui) for the description of the graphical user interface.
+If you want to skip to using the GUI without reading about the FPGA architecture and other software, click [here](#control-via-matlab) to read about the MATLAB classes used for control or [here](#matlab-graphical-user-interface) for the description of the graphical user interface.
 
 # Overview of FPGA behaviour
 
@@ -84,7 +84,7 @@ where the first line reads from memory address `0x40000000` and the second line 
 
 When reading from the block RAMs we want to read a lot of data in a short amount of time.  In this case we use a custom function `fetchData` (source `fetchData.c`) to read data from the FPGA.  This program uses two arguments: the number of samples to fetch and the RAM to fetch from.  The maximum number of samples to fetch is 16384.  The `fetchType` parameter, which is the second argument, has possible values [0,4] in integer steps, with 0 and 1 fetching raw data from the signal and auxiliary lines, respectively; values 2 and 3 fetching integrated data from the signal and auxiliary lines, respectively; and value 4 fetching the computed ratio.  The raw data is 16 bits internally in the FPGA so the two channels are concatenated into a single 32 bit data word.  The integrated data is 24 bits wide, so the two channels are interleaved as separate addresses in the block RAMs and retrieved as such.  The ratio data is 16 bits wide and thus is stored as one entry per address.
 
-## <a href="python-server"></a> Communication with a remote computer
+## Communication with a remote computer
 
 While the FPGA can be controlled via the command line while logged into the Red Pitaya using a shell or equivalent program such as PuTTY, it can be useful to control the device from a remote computer using a scripting language that has in-built data analysis and visualization capabilities such as Python or MATLAB.  To that end, a socket server has been implemented in Python that can read/write parameters to the device and fetch data.  The server can be started using the command
 ```
@@ -96,7 +96,7 @@ The server works via the class `Message` defined in `libserver.py` which handles
 
 Data is sent back to the client in the same form as it is received; namely, there is a 2 byte proto-header indicating the length of the following header information, followed by a message body.  The header has fields 'err', which is Boolean value indicating if there was an error; 'errMsg', which gives information about the error; and 'length', which is the length, in bytes, of the message body.  
 
-# <a href="matlab-control"></a> Control via MATLAB
+# Control via MATLAB
 
 A set of MATLAB classes exist to control the FPGA in addition to a MATLAB graphical user interface (GUI) for dealing with these classes.  There are four classes used for controlling the feedback design
 
@@ -141,7 +141,7 @@ where `signal` and `aux` are instances of `DPFeedbackData` which has properties 
 
 Important methods for the device are `upload()`, `fetch()`, `getRaw()`, `getProcessed()`, and `getRatio()`.  `upload()` uploads all current register values to the device, while `fetch()` retrieves all register values and converts them into parameter values.  `getRaw()` retrieves the raw ADC data from the device for both the signal and auxiliary lines.  `getProcessed()` retrieves the processed data for both signal and auxiliary lines, while `getRatio` retrieves the calculated ratio value from the device.
 
-# <a href="matlab-gui"></a> MATLAB Graphical User Interface
+# MATLAB Graphical User Interface
 
 A graphical user interface (GUI) was made to faciliate using the MATLAB classes.  I suggest invoking it by using the commands
 ```
