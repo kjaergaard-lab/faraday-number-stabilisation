@@ -287,6 +287,34 @@ classdef DPFeedbackParameter < handle
             end
         end
         
+        function s = struct(self)
+            %STRUCT Returns a structure representing the data
+            %
+            %   S = STRUCT(SELF) Returns structure S from current
+            %   object SELF
+            s.value = self.value;
+        end
+
+        function s = saveobj(self)
+            %SAVEOBJ Returns a structure used for saving data
+            %
+            %   S = SAVEOBJ(SELF) Returns structure S used for saving
+            %   data representing object SELF
+            s = self.struct;
+        end
+        
+    end
+    
+    methods(Static)
+        function self = loadobj(s)
+            %LOADOBJ Creates a DPFEEDBACKPARAMETER object using input
+            %structure
+            %
+            %   SELF = LOADOBJ(S) uses structure S to create new
+            %   DPFEEDBACKPARAMETER object SELF
+            self = DPFeedbackParameter;
+            self.value = s.value;
+        end
     end
     
 end

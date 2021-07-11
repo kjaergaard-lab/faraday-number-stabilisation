@@ -640,7 +640,112 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t             MW pulse period: %.2e s\n',self.mwPulsePeriod.value);
         end
         
+        function s = struct(self)
+            %STRUCT Returns a structure representing the data
+            %
+            %   S = STRUCT(SELF) Returns structure S from current
+            %   object SELF
+            s.signal = self.signal.struct;
+            s.aux = self.aux.struct;
+            s.ratio = self.ratio;
+            s.t = self.t;
+            
+            s.enableDP = self.enableDP.value;
+            s.enableFB = self.enableFB.value;
+            s.useFixedGain = self.useFixedGain.value;
+            s.enableManualMW = self.enableManualMW.value;
+            s.dpOnShutterOff = self.dpOnShutterOff.value;
+            s.auxOnShutterOff = self.auxOnShutterOff.value;
+            
+            s.width = self.width.value;
+            s.numpulses = self.numpulses.value;
+            s.period = self.period.value;
+            s.shutterDelay = self.shutterDelay.value;
+            s.auxDelay = self.auxDelay.value;
+            
+            s.delaySignal = self.delaySignal.value;
+            s.delayAux = self.delayAux.value;
+            s.samplesPerPulse = self.samplesPerPulse.value;
+            s.log2Avgs = self.log2Avgs.value;
+            
+            s.sumStart = self.sumStart.value;
+            s.subStart = self.subStart.value;
+            s.sumWidth = self.sumWidth.value;
+            for nn = 1:numel(self.offsets)
+                s.offsets(nn) = self.offsets(nn).value;
+            end
+            s.usePresetOffsets = self.usePresetOffsets.value;
+            
+            s.maxMWPulses = self.maxMWPulses.value;
+            s.target = self.target.value;
+            s.tol = self.tol.value;
+            
+            s.mwNumPulses = self.mwNumPulses.value;
+            s.mwPulseWidth = self.mwPulseWidth.value;
+            s.mwPulsePeriod = self.mwPulsePeriod.value;
+            
+            
+        end
+
+        function s = saveobj(self)
+            %SAVEOBJ Returns a structure used for saving data
+            %
+            %   S = SAVEOBJ(SELF) Returns structure S used for saving
+            %   data representing object SELF
+            s = self.struct;
+        end
         
+    end
+    
+    methods(Static)
+        function self = loadobj(s)
+            %LOADOBJ Creates a DPFEEDBACK object using input structure
+            %
+            %   SELF = LOADOBJ(S) uses structure S to create new DPFEEDBACK
+            %   object SELF
+            self = DPFeedback;
+            self.setDefaults;
+            
+            self.signal.loadobj(s.signal);
+            self.aux.loadobj(s.aux);
+            self.ratio = s.ratio;
+            self.t = s.t;
+            
+            self.enableDP.set(s.enableDP);
+            self.enableFB.set(s.enableFB);
+            self.useFixedGain.set(s.useFixedGain);
+            self.enableManualMW.set(s.enableManualMW);
+            self.dpOnShutterOff.set(s.dpOnShutterOff);
+            self.auxOnShutterOff.set(s.auxOnShutterOff);
+            
+            self.width.set(s.width);
+            self.numpulses.set(s.numpulses);
+            self.period.set(s.period);
+            self.shutterDelay.set(s.shutterDelay);
+            self.auxDelay.set(s.auxDelay);
+            
+            self.delaySignal.set(s.delaySignal);
+            self.delayAux.set(s.delayAux);
+            self.samplesPerPulse.set(s.samplesPerPulse);
+            self.log2Avgs.set(s.log2Avgs);
+            
+            self.sumStart.set(s.sumStart);
+            self.subStart.set(s.subStart);
+            self.sumWidth.set(s.sumWidth);
+            for nn = 1:numel(s.offsets)
+                self.offsets(nn).set(s.offsets(nn));
+            end
+            self.usePresetOffsets.set(s.usePresetOffsets);
+            
+            self.maxMWPulses.set(s.maxMWPulses);
+            self.target.set(s.target);
+            self.tol.set(s.tol);
+            
+            self.mwNumPulses.set(s.mwNumPulses);
+            self.mwPulseWidth.set(s.mwPulseWidth);
+            self.mwPulsePeriod.set(s.mwPulsePeriod);
+            
+        end
     end
     
 end
