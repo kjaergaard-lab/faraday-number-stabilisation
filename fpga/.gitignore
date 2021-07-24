@@ -4,6 +4,9 @@ rp-feedback/
 rp-feedback-sources/ip/*
 !rp-feedback-sources/ip/**/*.xci*
 
+rp-feedback-sources/system/**/
+rp-feedback-sources/system/*.bda
+
 *power-measurement*/
 !power-measurement.srcs/
 power-measurement.srcs/sources_1/bd/

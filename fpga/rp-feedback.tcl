@@ -288,8 +288,8 @@ set files [list \
  [file normalize "${origin_dir}/vhdl-common/QuickAvg.vhd"] \
  [file normalize "${origin_dir}/vhdl-common/SaveADCData.vhd"] \
  [file normalize "${origin_dir}/rp-feedback-sources/vhdl/topmod.vhd"] \
- [file normalize "${origin_dir}/rp-feedback/rp-feedback.srcs/sources_1/bd/system/system.bd"] \
- [file normalize "${origin_dir}/rp-feedback/rp-feedback.srcs/sources_1/imports/system_wrapper.v"] \
+ [file normalize "${origin_dir}/rp-feedback-sources/system/system.bd"] \
+ [file normalize "${origin_dir}/rp-feedback-sources/system/system_wrapper.v"] \
 ]
 add_files -norecurse -fileset $obj $files
 
@@ -557,7 +557,7 @@ set_property -name "used_in" -value "synthesis simulation" -objects $file_obj
 set_property -name "used_in_simulation" -value "1" -objects $file_obj
 set_property -name "used_in_synthesis" -value "1" -objects $file_obj
 
-set file "$origin_dir/rp-feedback/rp-feedback.srcs/sources_1/bd/system/system.bd"
+set file "$origin_dir/rp-feedback-sources/system/system.bd"
 set file [file normalize $file]
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
 set_property -name "exclude_debug_logic" -value "0" -objects $file_obj
@@ -575,7 +575,7 @@ set_property -name "used_in_implementation" -value "1" -objects $file_obj
 set_property -name "used_in_simulation" -value "1" -objects $file_obj
 set_property -name "used_in_synthesis" -value "1" -objects $file_obj
 
-set file "$origin_dir/rp-feedback/rp-feedback.srcs/sources_1/imports/system_wrapper.v"
+set file "$origin_dir/rp-feedback-sources/system/system_wrapper.v"
 set file [file normalize $file]
 set file_obj [get_files -of_objects [get_filesets sources_1] [list "*$file"]]
 set_property -name "file_type" -value "Verilog" -objects $file_obj
