@@ -620,6 +620,7 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t                   Offset(1): %d\n',self.offsets(1).value);
             fprintf(1,'\t\t                   Offset(2): %d\n',self.offsets(2).value);
             fprintf(1,'\t\t          Use Preset Offsets: %d\n',self.usePresetOffsets.value);
+            fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Computation Parameters\n');
             fprintf(1,'\t\t    Use Fixed Gains: %d\n',self.useFixedGain.value);
             fprintf(1,'\t\t       Fixed Aux(1): %d\n',self.fixedAux(1).value);
