@@ -191,7 +191,9 @@ pulseRegs(0)(15 downto 0) <= pulseRegs_i(0)(15 downto 0);
 pulseRegs(1) <= pulseRegs_i(1);
 pulseRegs(2) <= (others => '0');
 pulseRegs(3) <= (others => '0');
-
+--
+-- Component for creating microwave pulses
+--
 MicrowavePulses: PulseGen
 port map(
     clk     =>  clk,
@@ -201,9 +203,9 @@ port map(
     pulse_o =>  pulse_o,
     status_o=>  pulseStatus
 );
-
-
-
+--
+-- Process for calculating the number of microwave pulses to issue
+--
 ComputeProcess: process(clk,aresetn) is
 begin
     if aresetn = '0' then
@@ -214,11 +216,18 @@ begin
         diff <= (others => '0');
     elsif rising_edge(clk) then
         ComputeFSM: case(state) is
+            --
+            -- Wait for a start trigger. Needed so that additional, validation
+            -- pulses don't trigger the feedback process
+            --
             when idle =>
                 if cntrl_i.enable = '1' and trigSoftSync = "01" then
                     state <= waitforvalid;
                 end if;
-
+            --
+            -- This waits for a valid signal indicating a new value for the ratio
+            -- signal.  If this ratio is less than the tolerance it stops the process.
+            -- 
             when waitforvalid =>
                 pulseTrig <= '0';
                 if valid_i = '1' and cntrl_i.enable = '1' then
@@ -233,7 +242,9 @@ begin
                 else
                     cntrl_o.stop <= '0';
                 end if;
-                
+            --
+            -- Wait for division to complete
+            --
             when dividing =>
                 if count < DIVIDE_LATENCY then
                     count <= count + 1;
@@ -241,7 +252,9 @@ begin
                     count <= 0;
                     state <= multiplying;
                 end if;
-                
+            --
+            -- Wait for multiplication to finish, start microwave pulses
+            --
             when multiplying =>
                 if count < MULT_LATENCY then
                     count <= count + 1;
@@ -251,12 +264,15 @@ begin
                     state <= pulsing;
                     pulseTrig <= '1';
                 end if;
-                
+            --
+            -- Wait for pulses to finish, go back to waiting for a new valid ratio
+            -- 
             when pulsing =>
                 pulseTrig <= '0';
                 if pulseStatus.done = '1' then
-                    state <= idle;
+                    state <= waitforvalid;
                 end if;
+                
             when others => state <= idle;
         end case;
     end if;
