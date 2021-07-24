@@ -57,6 +57,10 @@ The `NumberStabilisation.vhd` controls the signals necessary for stabilising the
 
 This takes in the current ratio value and a one clock-cycle active-high valid signal. When feedback is enabled (input using the `cntrl_i.enable` port), the module computes the number of microwave pulses to output using the target ratio and the current ratio as well as the maximum number of pulses.  Feedback is attempted until the current ratio value is less than the tolerance.
 
+# Building a new bitstream
+
+All files necessary for re-creating the Xilinx Vivado project have been included as well as a TCL script that will perform this task.  To do so, open up Vivado and in the TCL console on start-up navigate to the *fpga/* sub-directory in the main repository directory.  Use the command `cd` to do so; exactly what path you need will depend on where Vivado starts from, but you can find the current working directory using the `pwd` command.  Once in the *fpga/* directory, run the command `source rp-feedback.tcl` in the TCL console.  This will create and populate the project.  When the project has finished building, use the "Generate Bitstream" command which can be found under the "Flow" menu.
+
 # Communication between FPGA and operating system
 
 ## Hardware description
@@ -141,6 +145,8 @@ where `signal` and `aux` are instances of `DPFeedbackData` which has properties 
 
 Important methods for the device are `upload()`, `fetch()`, `getRaw()`, `getProcessed()`, and `getRatio()`.  `upload()` uploads all current register values to the device, while `fetch()` retrieves all register values and converts them into parameter values.  `getRaw()` retrieves the raw ADC data from the device for both the signal and auxiliary lines.  `getProcessed()` retrieves the processed data for both signal and auxiliary lines, while `getRatio` retrieves the calculated ratio value from the device.
 
+A `DPFeedback` object can be saved to a MATLAB file using the normal save function.  Objects and classes are converted into structures before saving, which means that they take up little storage.  These saved structures can be loaded back into MATLAB and they will be converted back into `DPFeedback` objects.
+
 # MATLAB Graphical User Interface
 
 A graphical user interface (GUI) was made to faciliate using the MATLAB classes.  I suggest invoking it by using the commands
@@ -151,7 +157,7 @@ AppFeedbackDP(fb);%Creates the GUI
 ```
 ![View of GUI](images/matlab-gui.png)
 
-The above image shows how the GUI looks when on the settings tab, and the parameters are those that were used for feedback.  Other tabs (accessed at the top of the GUI) show the raw data, the processed data, and the ratio data.  Parameters can be entered in the relevant text fields, and the dispersive pulses, feedback, and/or manual microwvae pulses can be enabled/disabled using the checkboxes.  **Do not** use the "Signal Computation" settings as that was for a previous version of the feedback system and those functions are deprecated.  They have not been removed because of possible compatibility issues between difference MATLAB versions of their GUI editor.
+The above image shows how the GUI looks when on the settings tab, and the parameters are those that were used for feedback.  Other tabs (accessed at the top of the GUI) show the raw data, the processed data, and the ratio data.  Parameters can be entered in the relevant text fields, and the dispersive pulses, feedback, and/or manual microwvae pulses can be enabled/disabled using the checkboxes.  
 
 Once settings have been input, they can be uploaded to the device by clicking on the "Upload" button.  Similarly, current device settings can be retrieved using the "Fetch" button.  Data can be retrieved using the "Fetch Data" button; the device can be reset using "Reset"; and a start trigger can be sent using "Start".  
 
@@ -177,6 +183,14 @@ Below is a description of various parameters and how to set them.
   - *Sum/Sub width*: the width of the summation and subtraction regions.  The regions have to be non-overlapping, and `subStart + width` has to be less than the number of samples per pulse.  This width should encompass where the measured voltage from the optical signal is mostly flat.  When these parameters are set, and you have raw data to display on the "Raw Data" tab, these regions will be displayed as thick black dashed lines, and you can adjust them as necessary to get the right summation and subtraction ranges.
   - *Use Preset Offsets*: Enable to only calculate the sum, and then subtract the preset offsets from the summed data.  This may be useful if you want to acquire data very fast, since the summation *and* subtraction takes about twice as long as just integrating over the region with signal.  Technically, for a stable offset this will be less noisy by a factor of sqrt(2).  I have not tried this yet, and for feedback I recommend leaving preset offests disabled.
   - *Offset 1/Offset 2*: the preset offsets to use.
+
+## Signal Computation Settings
+  - *Use Fixed Aux Values*: For situations where one wants to acquire data at a very high rate but doesn't care about the stability of the signal amplitude, such as recording high-speed temporal changes like Rabi oscillations, one can disable the use of auxiliary pulses by enabling *Use Fixed Aux Values*.  The auxiliary values used for computing the ratio are then the values given by the inputs for *Fixed Aux*.
+  - *Fixed Aux*: Set these values when *Use Fixed Aux Values* is enabled to be used in computing the ratio.  
+
+## Validation Settings
+  - *Use Additional Pulses*: Enable to allow a certain number of optical pulse cycles *after* feedback has ended.  This may be used for validating the results of feedback.
+  - *Num. Add. Pulses*: The number of additional pulse cycles to occur *after* feedback ends if *Use Additional Pulses* is enabled.
 
 ## Microwave Settings
   - *Manual # MW Pulses*: If the checkbox *Enable Manual MW Pulses* is enabled on the top-left of the GUI, this tells the device how many microwave pulses to generate.  Up to 65535 microwave pulses.  Use this to determine the fraction of atoms that each microwave pulse removes (on average).
