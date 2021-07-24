@@ -12,11 +12,12 @@ entity PulseGen is
         
         --
         -- Array of parameters:
+        -- 3: (enable additional pulses(1), additional pulses (8))
         -- 2: delay
         -- 1: period
         -- 0: (number of pulses (16), pulse width (16))
         --
-        regs        :   in  t_param_reg_array(2 downto 0);
+        regs        :   in  t_param_reg_array(3 downto 0);
         
         pulse_o     :   out std_logic;                      --Output pulse
         status_o    :   out t_module_status                 --Output module status
@@ -32,18 +33,24 @@ signal state        :   t_status_local  :=  idle;
 signal trig, cntrl  :   std_logic_vector(1 downto 0)    :=  "00";
 signal count        :   unsigned(31 downto 0)   :=  (others => '0');
 
-signal numPulses, width :   unsigned(count'length-1 downto 0);
-signal period   :   unsigned(31 downto 0);
-signal delay    :   unsigned(31 downto 0);
+signal numPulsesSet, numPulsesUse   :   unsigned(count'length-1 downto 0);
+signal additionalPulses             :   unsigned(count'length-1 downto 0);
+signal enableAddtionalPulses        :   std_logic;
+signal width                        :   unsigned(count'length-1 downto 0)
+signal period                       :   unsigned(31 downto 0);
+signal delay                        :   unsigned(31 downto 0);
 
-signal pulseCount   :   unsigned(numPulses'length-1 downto 0)   :=  (others => '0');
+signal pulseCount                   :   unsigned(numPulses'length-1 downto 0)   :=  (others => '0');
 
 begin
 
-numPulses <= resize(unsigned(regs(0)(31 downto 16)),numPulses'length);
+numPulsesSet <= resize(unsigned(regs(0)(31 downto 16)),numPulses'length);
 width <= resize(unsigned(regs(0)(15 downto 0)),width'length);
 period <= unsigned(regs(1));
 delay <= unsigned(regs(2));
+
+additionalPulses <= resize(unsigned(regs(3)(7 downto 0)),additionalPulses'length);
+enableAdditionalPulses <= regs(3)(8);
 
 TrigSync: process(clk,aresetn) is
 begin
@@ -63,22 +70,33 @@ begin
         pulseCount <= (others => '0');
         count <= (others => '0');
         status_o <= INIT_MODULE_STATUS;
+        numPulsesUse <= (others => '0');
     elsif rising_edge(clk) then
-        if cntrl = "10" then
+        if cntrl = "10" and enableAdditionalPulses = '0' then
             --
             -- Falling edge of cntrl signal indicates that the pulse
-            -- process should stop
+            -- process should stop.  No additional pulses are issued
             --
             count <= (others => '0');
             pulseCount <= (others => '0');
             state <= idle;
             pulse_o <= '0';
             status_o <= (running => '0', done => '1', started => '0');
+        elsif cntrl = "10" and enableAdditionalPulses = '1' then
+            --
+            -- If a stop signal is received and additional pulses are
+            -- enabled, then increment counter by 1 to fix missed increment
+            -- and then set the "used" number of pulses to the "set" number
+            -- plus the additional amount.
+            --
+            count <= count + 1;
+            numPulsesUse <= pulseCount + additionalPulses + 1;
         else
-            FSM: case state is
+            FSM: case state
                 when idle =>
                     pulseCount <= (others => '0');
                     status_o.done <= '0';
+                    numPulsesUse <= numPulsesSet;
                     if trig = "01" and cntrl_i.enable = '1' then
                         count <= to_unsigned(1,count'length);
                         status_o.running <= '1';
@@ -121,9 +139,8 @@ begin
                     end if;
                     
                 when incrementing =>
-                    if pulseCount < numPulses then
+                    if pulseCount < numPulsesUse then
                         state <= pulsing;
---                        pulseCount <= pulseCount + 1;
                         pulse_o <= '1';
                     else
                         state <= idle;

@@ -17,7 +17,7 @@ classdef DPFeedback < handle
         
         enableDP            %Enables dispersive pulses
         enableFB            %Enables number feedback using microwaves
-        useFixedGain        %DEPRECATED
+        useFixedGain        %Enables the use of fixed auxiliary values
         enableManualMW      %Enables the use of manual microwave pulses
         dpOnShutterOff      %Keeps the signal AOM on when the shutter closes
         auxOnShutterOff     %Keeps the auxiliary AOM on when the shutter closes
@@ -27,6 +27,8 @@ classdef DPFeedback < handle
         period              %Dispersive pulse period
         shutterDelay        %Delay between when the trigger is registered and signal pulses start
         auxDelay            %Delay between when the trigger is registered and auxiliary pulses start
+        useAdditionalPulses %Enables the use of additional pulses after feedback has finished
+        additionalPulses    %Number of additional pulses to use
         
         delaySignal         %Delay between when a signal pulse is generated and data is acquired
         delayAux            %Delay between when an auxiliary pulse is generated and data is acquired
@@ -39,8 +41,7 @@ classdef DPFeedback < handle
         offsets             %Offset values to use instead of using the data
         usePresetOffsets    %Use present offests (above) or subtract offsets using data when no light is present?
         
-        auxMultipliers      %DEPRECATED
-        presetGains         %DEPRECATED
+        fixedAux            %Fixed auxiliary values to use for computing the ratio (useful for cases where rapid data collection is needed)
         
         maxMWPulses         %Maximum number of microwave pulses to use for each round of feedback
         target              %Target ratio value for feedback
@@ -66,7 +67,6 @@ classdef DPFeedback < handle
         pulseRegs           %Registers for pulse parameters
         avgRegs             %Registers for computing quick averages
         integrateRegs       %Registers for integrating data
-        gainComputeReg      %DEPRECATED
         signalComputeRegs   %Register for computing ratio value
         fbComputeRegs       %Register for handling feedback computation
         fbPulseRegs         %Register for microwave feedback pulse parameters
@@ -108,11 +108,11 @@ classdef DPFeedback < handle
             self.pulseRegs(2) = DPFeedbackRegister('C',self.conn);
             self.pulseRegs(3) = DPFeedbackRegister('10',self.conn);
             self.pulseRegs(4) = DPFeedbackRegister('14',self.conn);
-            self.avgRegs = DPFeedbackRegister('18',self.conn);
-            self.avgRegs(2) = DPFeedbackRegister('1C',self.conn);
-            self.integrateRegs = DPFeedbackRegister('20',self.conn);
-            self.integrateRegs(2) = DPFeedbackRegister('24',self.conn);
-            self.gainComputeReg = DPFeedbackRegister('28',self.conn);
+            self.pulseRegs(5) = DPFeedbackRegister('18',self.conn);
+            self.avgRegs = DPFeedbackRegister('1C',self.conn);
+            self.avgRegs(2) = DPFeedbackRegister('20',self.conn);
+            self.integrateRegs = DPFeedbackRegister('24',self.conn);
+            self.integrateRegs(2) = DPFeedbackRegister('28',self.conn);
             self.signalComputeRegs = DPFeedbackRegister('2C',self.conn);
             self.signalComputeRegs(2) = DPFeedbackRegister('30',self.conn);
             self.fbComputeRegs = DPFeedbackRegister('34',self.conn);
@@ -157,6 +157,12 @@ classdef DPFeedback < handle
             self.auxDelay = DPFeedbackParameter([0,31],self.pulseRegs(4))...
                 .setLimits('lower',0,'upper',10)...
                 .setFunctions('to',@(x) x*self.CLK,'from',@(x) x/self.CLK);
+            self.useAdditionalPulses = DPFeedbackParameter([8,8],self.pulseRegs(5))...
+                .setLimits('lower',0,'upper',1)...
+                .setFunctions('to',@(x) x,'from',@(x) x);
+            self.additionalPulses = DPFeedbackParameter([0,7],self.pulseRegs(5))...
+                .setLimits('lower',0,'upper',255)...
+                .setFunctions('to',@(x) x,'from',@(x) x);
             
             %Initial processing
             self.delaySignal = DPFeedbackParameter([0,13],self.avgRegs(1))...
@@ -193,16 +199,10 @@ classdef DPFeedback < handle
                 .setFunctions('to',@(x) x,'from',@(x) x);
             
             %Gain and signal computation
-            self.auxMultipliers = DPFeedbackParameter([0,7],self.gainComputeReg)...
-                .setLimits('lower',1,'upper',255)...
-                .setFunctions('to',@(x) x,'from',@(x) x);
-            self.auxMultipliers(2) = DPFeedbackParameter([8,15],self.gainComputeReg)...
-                .setLimits('lower',1,'upper',255)...
-                .setFunctions('to',@(x) x,'from',@(x) x);
-            self.presetGains = DPFeedbackParameter([0,31],self.signalComputeRegs(1))...
+            self.fixedAux = DPFeedbackParameter([0,31],self.signalComputeRegs(1))...
                 .setLimits('lower',1,'upper',2^32-1)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
-            self.presetGains(2) = DPFeedbackParameter([0,31],self.signalComputeRegs(2))...
+            self.fixedAux(2) = DPFeedbackParameter([0,31],self.signalComputeRegs(2))...
                 .setLimits('lower',1,'upper',2^32-1)...
                 .setFunctions('to',@(x) x,'from',@(x) x);
             
@@ -271,6 +271,8 @@ classdef DPFeedback < handle
             self.period.set(5e-6);
             self.shutterDelay.set(2.5e-3);
             self.auxDelay.set(2.5e-3);
+            self.useAdditionalPulses.set(0);
+            self.additionalPulses.set(5);
             
             self.delaySignal.set(500e-9);
             self.delayAux.set(1.75e-6);
@@ -284,10 +286,8 @@ classdef DPFeedback < handle
             self.offsets(2).set(0);
             self.usePresetOffsets.set(0);
             
-            self.auxMultipliers(1).set(255);
-            self.auxMultipliers(2).set(255);
-            self.presetGains(1).set(1);
-            self.presetGains(2).set(1);
+            self.fixedAux(1).set(1);
+            self.fixedAux(2).set(1);
             
             self.maxMWPulses.set(1e4*0.5);
             self.target.set(.1);
@@ -347,7 +347,6 @@ classdef DPFeedback < handle
             self.pulseRegs.write;
             self.avgRegs.write;
             self.integrateRegs.write;
-%             self.gainComputeReg.write;
             self.signalComputeRegs.write;
             self.fbComputeRegs.write;
             self.fbPulseRegs.write;
@@ -363,7 +362,6 @@ classdef DPFeedback < handle
             self.pulseRegs.read;
             self.avgRegs.read;
             self.integrateRegs.read;
-%             self.gainComputeReg.read;
             self.signalComputeRegs.read;
             self.fbComputeRegs.read;
             self.fbPulseRegs.read;
@@ -381,6 +379,8 @@ classdef DPFeedback < handle
             self.period.get;
             self.shutterDelay.get;
             self.auxDelay.get;
+            self.useAdditionalPulses.get;
+            self.additionalPulses.get;
             
             self.delaySignal.get;
             self.delayAux.get;
@@ -395,11 +395,8 @@ classdef DPFeedback < handle
             end
             self.usePresetOffsets.get;
             
-            for nn=1:numel(self.auxMultipliers)
-                self.auxMultipliers(nn).get;
-            end
-            for nn=1:numel(self.presetGains)
-                self.presetGains(nn).get;
+            for nn=1:numel(self.fixedAux)
+                self.fixedAux(nn).get;
             end
             
             self.maxMWPulses.get;
@@ -588,7 +585,6 @@ classdef DPFeedback < handle
             self.pulseRegs.makeString('pulseRegs',strwidth);
             self.avgRegs.makeString('avgReg',strwidth);
             self.integrateRegs.makeString('integrateRegs',strwidth);
-            self.gainComputeReg.makeString('gainComputeReg',strwidth);
             self.signalComputeRegs.makeString('signalComputeRegs',strwidth);
             self.fbComputeRegs.makeString('fbComputeRegs',strwidth);
             self.fbPulseRegs.makeString('fbPulseRegs',strwidth);
@@ -598,7 +594,6 @@ classdef DPFeedback < handle
             fprintf(1,'\t Auxiliary Parameters\n');
             fprintf(1,'\t\t          Enable DP: %d\n',self.enableDP.value);
             fprintf(1,'\t\t          Enable FB: %d\n',self.enableFB.value);
-            fprintf(1,'\t\t    Use Fixed Gains: %d\n',self.useFixedGain.value);
             fprintf(1,'\t\t   Manual MW Pulses: %d\n',self.enableManualMW.value);
             fprintf(1,'\t\t  DP on Shutter off: %d\n',self.dpOnShutterOff.value);
             fprintf(1,'\t\t Aux on Shutter off: %d\n',self.auxOnShutterOff.value);
@@ -609,6 +604,8 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t     Shutter Delay: %.2e s\n',self.shutterDelay.value);
             fprintf(1,'\t\t         Aux Delay: %.2e s\n',self.auxDelay.value);
             fprintf(1,'\t\t  Number of pulses: %d\n',self.numpulses.value);
+            fprintf(1,'\t\t   Use Add. Pulses: %d\n',self.useAdditionalPulses.value);
+            fprintf(1,'\t\t  Num. Add. Pulses: %d\n',self.additionalPulses.value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Averaging Parameters\n');
             fprintf(1,'\t\t       Signal Delay: %.2e s\n',self.delaySignal.value);
@@ -623,6 +620,10 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t                   Offset(1): %d\n',self.offsets(1).value);
             fprintf(1,'\t\t                   Offset(2): %d\n',self.offsets(2).value);
             fprintf(1,'\t\t          Use Preset Offsets: %d\n',self.usePresetOffsets.value);
+            fprintf(1,'\t Computation Parameters\n');
+            fprintf(1,'\t\t    Use Fixed Gains: %d\n',self.useFixedGain.value);
+            fprintf(1,'\t\t       Fixed Aux(1): %d\n',self.fixedAux(1).value);
+            fprintf(1,'\t\t       Fixed Aux(2): %d\n',self.fixedAux(2).value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Collection Results\n');
             fprintf(1,'\t\t Number of signal samples collected: %d\n',self.samplesCollected(1).value);
@@ -662,6 +663,8 @@ classdef DPFeedback < handle
             s.period = self.period.value;
             s.shutterDelay = self.shutterDelay.value;
             s.auxDelay = self.auxDelay.value;
+            s.useAdditionalPulses = self.useAdditionalPulses.value;
+            s.additionalPulses = self.additionalPulses.value;
             
             s.delaySignal = self.delaySignal.value;
             s.delayAux = self.delayAux.value;
@@ -675,6 +678,10 @@ classdef DPFeedback < handle
                 s.offsets(nn) = self.offsets(nn).value;
             end
             s.usePresetOffsets = self.usePresetOffsets.value;
+
+            for nn = 1:numel(self.fixedAux)
+                s.fixedAux(nn) = self.fixedAux(nn).value;
+            end
             
             s.maxMWPulses = self.maxMWPulses.value;
             s.target = self.target.value;
@@ -723,6 +730,8 @@ classdef DPFeedback < handle
             self.period.set(s.period);
             self.shutterDelay.set(s.shutterDelay);
             self.auxDelay.set(s.auxDelay);
+            self.useAdditionalPulses.set(s.useAdditionalPulses);
+            self.additionalPulses.set(s.additionalPulses);
             
             self.delaySignal.set(s.delaySignal);
             self.delayAux.set(s.delayAux);
@@ -736,6 +745,10 @@ classdef DPFeedback < handle
                 self.offsets(nn).set(s.offsets(nn));
             end
             self.usePresetOffsets.set(s.usePresetOffsets);
+
+            for nn = 1:numel(s.fixedAux)
+                self.fixedAux(nn).set(s.fixedAux(nn));
+            end
             
             self.maxMWPulses.set(s.maxMWPulses);
             self.target.set(s.target);

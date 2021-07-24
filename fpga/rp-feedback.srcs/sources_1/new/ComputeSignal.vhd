@@ -16,8 +16,8 @@ entity ComputeSignal is
         dataA_i     :   in  t_adc_integrated_array(1 downto 0);     --Input auxiliary integrated data on two channels
         validA_i    :   in  std_logic;                              --High for one cycle when data_i is valid
         
-        useFixedGain:   in  std_logic;                              --Use fixed gain/auxiliary values
-        fixedGains  :   in  t_param_reg_array(1 downto 0);          --The fixed gain/auxiliary values to use
+        useFixedAux :   in  std_logic;                              --Use fixed auxiliary values
+        fixedAux    :   in  t_param_reg_array(1 downto 0);          --The fixed auxiliary values to use
         
         ratio_o     :   out signed(SIGNAL_WIDTH-1 downto 0);        --Output division signal
         valid_o     :   out std_logic                               --High for one cycle when ratio_o is valid
@@ -75,13 +75,6 @@ signal div_int, div_frac:   signed(SIGNAL_WIDTH-1 downto 0) :=  (others => '0');
 
 
 begin
-
---
--- Parse parameters
---
---fixedGain_slv(0) <= multipliers(GAIN_WIDTH-1 downto 0);
---fixedGain_slv(1) <= multipliers(PARAM_WIDTH-1 downto GAIN_WIDTH);
-
 --
 -- Convert signal data
 --
@@ -91,8 +84,8 @@ signal_slv(1) <= std_logic_vector(dataS_i(1));
 --
 -- Note the reversal of the indices so that we get g_0 x S_1 and g_1 x S_0
 --
-aux_slv(0) <= std_logic_vector(dataA_i(1)) when useFixedGain = '0' else std_logic_vector(fixedGains(1)(INTEG_WIDTH-1 downto 0));
-aux_slv(1) <= std_logic_vector(dataA_i(0)) when useFixedGain = '0' else std_logic_vector(fixedGains(0)(INTEG_WIDTH-1 downto 0));
+aux_slv(0) <= std_logic_vector(dataA_i(1)) when useFixedAux = '0' else std_logic_vector(fixedAux(1)(INTEG_WIDTH-1 downto 0));
+aux_slv(1) <= std_logic_vector(dataA_i(0)) when useFixedAux = '0' else std_logic_vector(fixedAux(0)(INTEG_WIDTH-1 downto 0));
 
 --
 -- Multiply signals

@@ -97,8 +97,8 @@ component ComputeSignal is
         dataA_i     :   in  t_adc_integrated_array(1 downto 0);     --Input auxiliary integrated data on two channels
         validA_i    :   in  std_logic;                              --High for one cycle when data_i is valid
         
-        useFixedGain:   in  std_logic;                              --Use fixed gain/auxiliary values
-        fixedGains  :   in  t_param_reg_array(1 downto 0);          --The fixed gain/auxiliary values to use
+        useFixedAux :   in  std_logic;                              --Use fixed auxiliary values
+        fixedAux    :   in  t_param_reg_array(1 downto 0);          --The fixed auxiliary values to use
         
         ratio_o     :   out signed(SIGNAL_WIDTH-1 downto 0);        --Output division signal
         valid_o     :   out std_logic                               --High for one cycle when ratio_o is valid
@@ -166,9 +166,9 @@ signal sharedReg            :   t_param_reg                     :=  (others => '
 --
 -- Acquisition registers
 --
-signal pulseRegs            :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
-signal pulseRegsSignal      :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
-signal pulseRegsAux         :   t_param_reg_array(2 downto 0)   :=  (others => (others => '0'));
+signal pulseRegs            :   t_param_reg_array(3 downto 0)   :=  (others => (others => '0'));
+signal pulseRegsSignal      :   t_param_reg_array(3 downto 0)   :=  (others => (others => '0'));
+signal pulseRegsAux         :   t_param_reg_array(3 downto 0)   :=  (others => (others => '0'));
 signal avgRegSignal         :   t_param_reg                     :=  (others => '0');
 signal avgRegAux            :   t_param_reg                     :=  (others => '0');
 signal avgRegs              :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
@@ -214,14 +214,15 @@ signal validIntAux          :   std_logic                       :=  '0';
 --
 -- Signal computation signals
 --
-signal useFixedGain         :   std_logic;
-signal fixedGains           :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
+signal useFixedAux          :   std_logic;
+signal fixedAux             :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
 signal ratio                :   signed(SIGNAL_WIDTH-1 downto 0) :=  (others => '0');
 signal ratioValid           :   std_logic                       :=  '0';
 
 --
 -- Feedback signals
 --
+signal fbreset_i            :   std_logic;
 signal fbControl_i          :   t_control                       :=  INIT_CONTROL_ENABLED;
 signal fbControl_o          :   t_control                       :=  INIT_CONTROL_ENABLED;
 signal fbComputeRegs        :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
@@ -297,23 +298,6 @@ port map(
 );
 
 --
--- Compute the gain values from the auxiliary measuremnts
---
---GainComputation: ComputeGain
---port map(
---    clk             =>  adcClk,
---    aresetn         =>  aresetn,
-    
---    data_i          =>  dataIntAux,
---    valid_i         =>  validIntAux,
-
---    multipliers     =>  gainMultipliers,
-
---    gain_o          =>  gain,
---    valid_o         =>  gainValid
---);
-
---
 -- Compute the ratio S_-/S_+
 --
 SignalComputation: ComputeSignal
@@ -327,8 +311,8 @@ port map(
     dataA_i         =>  dataIntAux,
     validA_i        =>  validIntAux,
 
-    useFixedGain    =>  useFixedGain,
-    fixedGains      =>  fixedGains,
+    useFixedAux     =>  useFixedAux,
+    fixedAux        =>  fixedAux,
 
     ratio_o         =>  ratio,
     valid_o         =>  ratioValid
@@ -340,7 +324,7 @@ port map(
 StabiliseNumber: NumberStabilisation
 port map(
     clk             =>  adcClk,
-    aresetn         =>  aresetn,
+    aresetn         =>  fbreset,
     cntrl_i         =>  fbControl_i,
 
     computeRegs     =>  fbComputeRegs,
@@ -396,7 +380,9 @@ resp_o <= bus_s.resp;
 -- Assigns appropriate values to pulse registers
 --
 pulseRegsSignal(1 downto 0) <= pulseRegs(1 downto 0);
+pulseRegsSignal(3) <= pulseRegs(3);
 pulseRegsAux(1 downto 0) <= pulseRegs(1 downto 0);
+pulseRegsAux(3) <= pulseRegs(3);
 avgRegSignal <= avgRegs(0);
 avgRegAux <= avgRegs(0)(avgRegAux'length-1 downto 14) & avgRegs(1)(13 downto 0);
 
@@ -409,11 +395,12 @@ cntrlSignal_i.stop <= fbControl_o.stop;
 cntrlAux_i.start <= triggers(0) or trig;
 cntrlAux_i.stop <= fbControl_o.stop;
 fbControl_i.start <= triggers(1) or trig;
+fbreset <= aresetn and (not statusSignal.done);
 
 cntrlSignal_i.enable <= sharedReg(0);
-cntrlAux_i.enable <= sharedReg(0) and (not useFixedGain);
+cntrlAux_i.enable <= sharedReg(0) and (not useFixedAux);
 fbControl_i.enable <= sharedReg(1);
-useFixedGain <= sharedReg(2);
+useFixedAux <= sharedReg(2);
 fbAuxReg <= (0 => sharedReg(3), others => '0');
 signalDefaultState <= sharedReg(4);
 auxDefaultState <= sharedReg(5);
@@ -500,13 +487,13 @@ begin
                             when X"00000C" => rw(bus_m,bus_s,comState,pulseRegs(1));
                             when X"000010" => rw(bus_m,bus_s,comState,pulseRegsSignal(2));
                             when X"000014" => rw(bus_m,bus_s,comState,pulseRegsAux(2));
-                            when X"000018" => rw(bus_m,bus_s,comState,avgRegs(0));
-                            when X"00001C" => rw(bus_m,bus_s,comState,avgRegs(1));
-                            when X"000020" => rw(bus_m,bus_s,comState,integrateRegs(0));
-                            when X"000024" => rw(bus_m,bus_s,comState,integrateRegs(1));
---                            when X"000028" => rw(bus_m,bus_s,comState,gainMultipliers);
-                            when X"00002C" => rw(bus_m,bus_s,comState,fixedGains(0));
-                            when X"000030" => rw(bus_m,bus_s,comState,fixedGains(1));
+                            when X"000018" => rw(bus_m,bus_s,comState,pulseRegs(3));
+                            when X"00001C" => rw(bus_m,bus_s,comState,avgRegs(0));
+                            when X"000020" => rw(bus_m,bus_s,comState,avgRegs(1));
+                            when X"000024" => rw(bus_m,bus_s,comState,integrateRegs(0));
+                            when X"000028" => rw(bus_m,bus_s,comState,integrateRegs(1));
+                            when X"00002C" => rw(bus_m,bus_s,comState,fixedAux(0));
+                            when X"000030" => rw(bus_m,bus_s,comState,fixedAux(1));
                             when X"000034" => rw(bus_m,bus_s,comState,fbComputeRegs(0));
                             when X"000038" => rw(bus_m,bus_s,comState,fbComputeRegs(1));
                             when X"00003C" => rw(bus_m,bus_s,comState,fbPulseRegs(0));

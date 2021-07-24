@@ -23,7 +23,7 @@ entity DualChannelAcquisition is
         --
         -- Parameter registers
         --
-        pulseRegs       :   in  t_param_reg_array(2 downto 0);      --Registers for controlling pulses
+        pulseRegs       :   in  t_param_reg_array(3 downto 0);      --Registers for controlling pulses
         avgReg          :   in  t_param_reg;                        --Register for controlling quick averaging/downsampling
         integrateRegs   :   in  t_param_reg_array(1 downto 0);      --Registers for controlling integration
 
@@ -58,11 +58,12 @@ component PulseGen is
         
         --
         -- Array of parameters:
+        -- 3: (enable additional pulses(1), additional pulses (8))
         -- 2: delay
         -- 1: period
         -- 0: (number of pulses (16), pulse width (16))
         --
-        regs        :   in  t_param_reg_array(2 downto 0);
+        regs        :   in  t_param_reg_array(3 downto 0);
         
         pulse_o     :   out std_logic;                      --Output pulse
         status_o    :   out t_module_status                 --Output module status

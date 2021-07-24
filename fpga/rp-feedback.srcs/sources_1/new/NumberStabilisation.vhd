@@ -66,11 +66,12 @@ component PulseGen is
         
         --
         -- Array of parameters:
+        -- 3: (enable additional pulses(1), additional pulses (8))
         -- 2: delay
         -- 1: period
         -- 0: (number of pulses (16), pulse width (16))
         --
-        regs        :   in  t_param_reg_array(2 downto 0);
+        regs        :   in  t_param_reg_array(3 downto 0);
         
         pulse_o     :   out std_logic;                      --Output pulse
         status_o    :   out t_module_status                 --Output module status
@@ -81,7 +82,7 @@ constant DIVIDE_LATENCY :   natural :=  40;
 constant MULT_LATENCY   :   natural :=  4;
 constant MAX_NUM_PULSES :   natural :=  65535;
 
-type t_status_local is (idle, dividing, multiplying, pulsing);
+type t_status_local is (idle, waitforvalid, dividing, multiplying, pulsing);
 signal state            :   t_status_local                      :=  idle;
 signal count            :   natural range 0 to 255              :=  0;
 
@@ -99,7 +100,7 @@ signal trigSoftSync     :   std_logic_vector(1 downto 0)        :=  (others => '
 signal pulseCntrl       :   t_control                           :=  INIT_CONTROL_ENABLED;
 signal pulseStatus      :   t_module_status                     :=  INIT_MODULE_STATUS;
 signal pulseTrig        :   std_logic                           :=  '0';
-signal pulseRegs        :   t_param_reg_array(2 downto 0)       :=  (others => (others => '0'));
+signal pulseRegs        :   t_param_reg_array(3 downto 0)       :=  (others => (others => '0'));
 signal numPulsesMan     :   std_logic_vector(PULSE_NUM_WIDTH-1 downto 0)    :=  (others => '0');
 
 --
@@ -123,8 +124,6 @@ begin
 numPulsesMax <= resize(unsigned(computeRegs(0)(15 downto 0)),numPulsesMax'length);
 target <= unsigned(computeRegs(0)(31 downto 16));
 tol <= unsigned(computeRegs(1)(15 downto 0));
---target <= unsigned(computeRegs(1)) & unsigned(computeRegs(0)(31 downto 16));
---tol <= unsigned(computeRegs(3)(15 downto 0)) & unsigned(computeRegs(2));
 
 ratio_abs <= unsigned(abs(shift_left(ratio_i,1)));
 
@@ -191,6 +190,7 @@ pulseRegs(0)(PARAM_WIDTH-1 downto 16) <= pulseRegs_i(0)(PARAM_WIDTH-1 downto 16)
 pulseRegs(0)(15 downto 0) <= pulseRegs_i(0)(15 downto 0);
 pulseRegs(1) <= pulseRegs_i(1);
 pulseRegs(2) <= (others => '0');
+pulseRegs(3) <= (others => '0');
 
 MicrowavePulses: PulseGen
 port map(
@@ -215,6 +215,11 @@ begin
     elsif rising_edge(clk) then
         ComputeFSM: case(state) is
             when idle =>
+                if cntrl_i.enable = '1' and trigSoftSync = "01" then
+                    state <= waitforvalid;
+                end if;
+
+            when waitforvalid =>
                 pulseTrig <= '0';
                 if valid_i = '1' and cntrl_i.enable = '1' then
                     if ratio_abs > tol and ratio_abs > target then
@@ -223,6 +228,7 @@ begin
                         count <= 0;
                     else
                         cntrl_o.stop <= '1';
+                        state <= idle;
                     end if;
                 else
                     cntrl_o.stop <= '0';
