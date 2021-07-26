@@ -221,6 +221,7 @@ begin
             -- pulses don't trigger the feedback process
             --
             when idle =>
+                cntrl_o <= INIT_CONTROL_ENABLED;
                 if cntrl_i.enable = '1' and trigSoftSync = "01" then
                     state <= waitforvalid;
                 end if;
@@ -235,6 +236,7 @@ begin
                         diff <= ratio_abs - target;
                         state <= dividing;
                         count <= 0;
+                        cntrl_o.stop <= '0';
                     else
                         cntrl_o.stop <= '1';
                         state <= idle;

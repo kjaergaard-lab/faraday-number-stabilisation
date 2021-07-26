@@ -5,7 +5,6 @@ classdef DPFeedback < handle
         signal              %An instance of DPFeedbackData representing signal data
         aux                 %An instance of DPFeedbackData representing auxiliary data
         
-        gains               %DEPRECATED
         sum                 %Calculated SxSy' - Sx'Sy data
         diff                %Calculated SxSy' + Sx'Sy data
         ratio               %Retrieved ratio data
@@ -17,7 +16,7 @@ classdef DPFeedback < handle
         
         enableDP            %Enables dispersive pulses
         enableFB            %Enables number feedback using microwaves
-        useFixedGain        %Enables the use of fixed auxiliary values
+        useFixedAux         %Enables the use of fixed auxiliary values
         enableManualMW      %Enables the use of manual microwave pulses
         dpOnShutterOff      %Keeps the signal AOM on when the shutter closes
         auxOnShutterOff     %Keeps the auxiliary AOM on when the shutter closes
@@ -132,7 +131,7 @@ classdef DPFeedback < handle
                 .setLimits('lower',0,'upper',1);
             self.enableFB = DPFeedbackParameter([1,1],self.sharedReg)...
                 .setLimits('lower',0,'upper',1);
-            self.useFixedGain = DPFeedbackParameter([2,2],self.sharedReg)...
+            self.useFixedAux = DPFeedbackParameter([2,2],self.sharedReg)...
                 .setLimits('lower',0,'upper',1);
             self.enableManualMW = DPFeedbackParameter([3,3],self.sharedReg)...
                 .setLimits('lower',0,'upper',1);
@@ -261,7 +260,7 @@ classdef DPFeedback < handle
             %   FB = FB.SETDEFAULTS() sets default values for FB
             self.enableDP.set(1);
             self.enableFB.set(0);
-            self.useFixedGain.set(0);
+            self.useFixedAux.set(0);
             self.enableManualMW.set(0);
             self.dpOnShutterOff.set(0);
             self.auxOnShutterOff.set(0);
@@ -369,7 +368,7 @@ classdef DPFeedback < handle
             %Read parameters
             self.enableDP.get;
             self.enableFB.get;
-            self.useFixedGain.get;
+            self.useFixedAux.get;
             self.enableManualMW.get;
             self.dpOnShutterOff.get;
             self.auxOnShutterOff.get;
@@ -490,6 +489,11 @@ classdef DPFeedback < handle
             if nargin == 1
                 self.getProcessed(1);
                 self.getProcessed(2);
+                
+                if self.useFixedAux.value
+                    self.aux.t = self.period.value*(0:(self.pulsesCollected(1).value-1))';
+                    self.aux.data = repmat([self.fixedAux(1).value,self.fixedAux(2).value],numel(self.aux.t),1);
+                end
             elseif nargin == 2
                 self.pulsesCollected(qq).read;
                 self.conn.write(0,'mode','fetch data','fetchType',2*qq-1,'numFetch',2*self.pulsesCollected(qq).value);
@@ -511,6 +515,36 @@ classdef DPFeedback < handle
                     self.aux.t = self.period.value*(0:(self.pulsesCollected(qq).value-1))';
                 end
             end
+            
+        end
+        
+        function self = calcSumDiff(self,method)
+            %CALCSUMDIFF Calculates the sum and difference values from the
+            %processed data
+            %
+            %   FB = FB.CALCSUMDIFF() Calculates the sum and difference
+            %   values from processed data by converting data to floating
+            %   point values
+            %
+            %   FB = FB.CALCSUMDIFF(METHOD) calculates the sum and
+            %   difference values from the processed data using METHOD,
+            %   which is either "float" or "int"
+            if nargin == 1
+                method = 'float';
+            elseif ~strcmpi(method,'int') && ~strcmpi(method,'float')
+                error('Method can only be ''int'' or ''float''');
+            end
+            
+            if strcmpi(method,'int')
+                sSig = fix(self.signal.data*self.sumWidth.value);
+                sAux = fix(self.aux.data*self.sumWidth.value);
+                self.sum = fix(sSig(:,1).*sAux(:,2)) + fix(sSig(:,2).*sAux(:,1));
+                self.diff = fix(sSig(:,1).*sAux(:,2)) - fix(sSig(:,2).*sAux(:,1));
+            elseif strcmpi(method,'float')
+                self.sum = self.signal.data(:,1).*self.aux.data(:,2) + self.signal.data(:,2).*self.aux.data(:,1);
+                self.diff = self.signal.data(:,1).*self.aux.data(:,2) - self.signal.data(:,2).*self.aux.data(:,1);
+            end
+            self.t = self.signal.t;
         end
         
         function self = calcRatio(self,method)
@@ -527,31 +561,9 @@ classdef DPFeedback < handle
             elseif ~strcmpi(method,'int') && ~strcmpi(method,'float')
                 error('Method can only be ''int'' or ''float''');
             end
-            if self.useFixedGain.value
-                self.gains = fix(repmat([self.presetGains.value],numel(self.signal.t),1));
-            else
-                if strcmpi(method,'int')
-                    self.gains = fix(self.aux.data.*self.sumWidth.value);
-                    self.gains = fix(self.gains);
-                elseif strcmpi(method,'float')
-                    self.gains = self.aux.data.*self.sumWidth.value;
-                    self.gains = self.gains;
-                end 
-            end
             
-            if strcmpi(method,'int')
-                sx = self.gains(:,2).*fix(self.signal.data(:,1)*self.sumWidth.value);
-                sy = self.gains(:,1).*fix(self.signal.data(:,2)*self.sumWidth.value);
-                self.sum = sx+sy;
-                self.diff = sx-sy;                
-                self.ratio = self.diff./self.sum;
-            elseif strcmpi(method,'float')
-                sx = self.gains(:,2).*self.signal.data(:,1);
-                sy = self.gains(:,1).*self.signal.data(:,2);
-                self.sum = sx+sy;
-                self.diff = sx-sy;
-                self.ratio = self.diff./self.sum;
-            end
+            self.calcSumDiff(method);
+            self.ratio = self.diff./self.sum;
             self.t = self.signal.t;
         end
         
@@ -622,7 +634,7 @@ classdef DPFeedback < handle
             fprintf(1,'\t\t          Use Preset Offsets: %d\n',self.usePresetOffsets.value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');
             fprintf(1,'\t Computation Parameters\n');
-            fprintf(1,'\t\t    Use Fixed Gains: %d\n',self.useFixedGain.value);
+            fprintf(1,'\t\t      Use Fixed Aux: %d\n',self.useFixedAux.value);
             fprintf(1,'\t\t       Fixed Aux(1): %d\n',self.fixedAux(1).value);
             fprintf(1,'\t\t       Fixed Aux(2): %d\n',self.fixedAux(2).value);
             fprintf(1,'\t ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n');

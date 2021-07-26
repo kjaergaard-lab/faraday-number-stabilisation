@@ -31,7 +31,7 @@ component NumberStabilisation is
         pulseRegs_i     :   in  t_param_reg_array(1 downto 0);
         auxReg          :   in  t_param_reg;                        --Auxiliary register (X (31), enable software triggers (1))
         
-        ratio_i         :   in  unsigned(SIGNAL_WIDTH-1 downto 0);  --Input signal as a ratio
+        ratio_i         :   in  signed(SIGNAL_WIDTH-1 downto 0);    --Input signal as a ratio
         valid_i         :   in  std_logic;                          --High for one cycle when ratio_i is valid
         
         cntrl_o         :   out t_control;                          --Output control signal
@@ -47,7 +47,7 @@ signal cntrl_i      :   t_control   :=  INIT_CONTROL_ENABLED;
 signal computeRegs  :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
 signal pulseRegs    :   t_param_reg_array(1 downto 0)   :=  (others => (others => '0'));
 signal auxReg       :   t_param_reg                     :=  (others => '0');
-signal ratio_i      :   unsigned(SIGNAL_WIDTH-1 downto 0)   :=  (others => '0');
+signal ratio_i      :   signed(SIGNAL_WIDTH-1 downto 0)   :=  (others => '0');
 signal valid_i      :   std_logic                       :=  '0';
 
 signal cntrl_o      :   t_control;
@@ -88,10 +88,9 @@ begin
 	wait for clkPeriod/2;
 end process;
 
-ratio_i <= X"009000";
-target <= X"008000";
-tol <= X"008100";
-numPulsesMax <= std_logic_vector(to_unsigned(50,numPulsesMan'length));
+target <= X"0800";
+tol <= X"0810";
+numPulsesMax <= std_logic_vector(to_unsigned(10,numPulsesMan'length));
 numPulsesMan <= std_logic_vector(to_unsigned(10,numPulsesMan'length));
 
 pulsePeriod <= std_logic_vector(to_unsigned(10,pulsePeriod'length));
@@ -101,10 +100,11 @@ tb: process is
 begin
     aresetn <= '0';
     valid_i <= '0';
+    ratio_i <= X"0800";
     wait for 50 ns;
     aresetn <= '1';
     
-    computeRegs <= (0 => (target(15 downto 0) & numPulsesMax), 1 => tol & target(23 downto 16));
+    computeRegs <= (0 => (target(15 downto 0) & numPulsesMax), 1 => X"0000" & tol);
     pulseRegs <= (0 => (numPulsesMan & pulseWidth), 1 => pulsePeriod);
     auxReg <= (0 => '0', others => '0');
     
@@ -113,14 +113,21 @@ begin
     wait for 50 ns;
 
     wait until clk'event and clk = '1';
-    valid_i <= '1';
     cntrl_i.start <= '1';
     wait until clk'event and clk = '1';
-    valid_i <= '0';
     cntrl_i.start <= '0';
-    wait for 50*clkPeriod;
-    
-    wait for 100*clkPeriod;
+    wait for 100 ns;
+    wait until clk'event and clk = '1';
+    valid_i <= '1';
+    wait until clk'event and clk = '1';
+    valid_i <= '0';
+    wait for 2 us;
+    wait until clk'event and clk = '1';
+    ratio_i <= X"0400";
+    valid_i <= '1';
+    wait until clk'event and clk = '1';
+    valid_i <= '0';
+    wait for 1 us;
     wait;
 end process;
 
