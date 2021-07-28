@@ -666,7 +666,7 @@ classdef DPFeedback < handle
             
             s.enableDP = self.enableDP.value;
             s.enableFB = self.enableFB.value;
-            s.useFixedGain = self.useFixedGain.value;
+            s.useFixedAux = self.useFixedAux.value;
             s.enableManualMW = self.enableManualMW.value;
             s.dpOnShutterOff = self.dpOnShutterOff.value;
             s.auxOnShutterOff = self.auxOnShutterOff.value;
@@ -733,7 +733,7 @@ classdef DPFeedback < handle
             
             self.enableDP.set(s.enableDP);
             self.enableFB.set(s.enableFB);
-            self.useFixedGain.set(s.useFixedGain);
+            self.useFixedAux.set(s.useFixedAux);
             self.enableManualMW.set(s.enableManualMW);
             self.dpOnShutterOff.set(s.dpOnShutterOff);
             self.auxOnShutterOff.set(s.auxOnShutterOff);
