@@ -550,8 +550,8 @@ begin
                         bus_s.resp <= "11";
                 end case;
             when finishing =>
-                triggers <= (others => '0');
-                reset <= '0';
+--                triggers <= (others => '0');
+--                reset <= '0';
                 comState <= idle;
 
             when others => comState <= idle;

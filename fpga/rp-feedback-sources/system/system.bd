@@ -2740,16 +2740,16 @@
       }
     },
     "interface_nets": {
-      "PS7_DDR": {
-        "interface_ports": [
-          "DDR",
-          "PS7/DDR"
-        ]
-      },
       "PS7_FIXED_IO": {
         "interface_ports": [
           "FIXED_IO",
           "PS7/FIXED_IO"
+        ]
+      },
+      "PS7_DDR": {
+        "interface_ports": [
+          "DDR",
+          "PS7/DDR"
         ]
       }
     },
